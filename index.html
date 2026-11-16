@@ -1,0 +1,552 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="robots" content="noindex,nofollow">
+<title>新作の型数シミュレーター</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Zen+Kaku+Gothic+New:wght@400;500;700&family=IBM+Plex+Mono:wght@500&display=swap">
+<style>
+/* 型数の計画表：左に投入月ごとの型数（操作）、右に「いつ売上になるか」の積み上げ。下に投入月×売上月の表 */
+:root{
+  --bg:#f6f6f3; --panel:#ffffff; --ink:#1d2126; --ink-2:#4a5058; --ink-3:#7d838b; --line:#e2e2dc; --line-2:#cfd0c9;
+  --accent:#23405c; --accent-ink:#ffffff; --good:#1f7a4d; --warn:#a15c00; --bad:#b3362f;
+  --exist:#b9bdb8; --target:#1d2126;
+  --s0:#2a78d6; --s1:#eb6834; --s2:#1baf7a; --s3:#eda100; --s4:#e87ba4; --s5:#008300;
+  --font:"Zen Kaku Gothic New","Hiragino Kaku Gothic ProN","Yu Gothic UI","Meiryo",system-ui,sans-serif;
+  --mono:"IBM Plex Mono",ui-monospace,"SFMono-Regular",Consolas,monospace;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#141619; --panel:#1c1f23; --ink:#eceee9; --ink-2:#c3c6c0; --ink-3:#8d929a; --line:#2c3036; --line-2:#3a3f46;
+  --accent:#9cc3e8; --accent-ink:#101418; --good:#4fbf86; --warn:#e0a03a; --bad:#ec6d64;
+  --exist:#5a5f63; --target:#eceee9;
+  --s0:#3987e5; --s1:#d95926; --s2:#199e70; --s3:#c98500; --s4:#d55181; --s5:#008300; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#141619; --panel:#1c1f23; --ink:#eceee9; --ink-2:#c3c6c0; --ink-3:#8d929a; --line:#2c3036; --line-2:#3a3f46;
+  --accent:#9cc3e8; --accent-ink:#101418; --good:#4fbf86; --warn:#e0a03a; --bad:#ec6d64;
+  --exist:#5a5f63; --target:#eceee9;
+  --s0:#3987e5; --s1:#d95926; --s2:#199e70; --s3:#c98500; --s4:#d55181; --s5:#008300; color-scheme:dark}
+body{background:var(--bg);color:var(--ink);font-family:var(--font);font-size:14px;line-height:1.6}
+.wrap{max-width:1180px;margin:0 auto;padding-block:20px 48px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));display:flex;flex-direction:column;gap:18px}
+h1{font-size:24px;font-weight:700;margin:0;letter-spacing:.02em;text-wrap:balance}
+.sub{color:var(--ink-2);margin:4px 0 0;max-width:70ch}
+.num{font-family:var(--mono);font-variant-numeric:tabular-nums}
+.tabs{display:flex;gap:6px;flex-wrap:wrap}
+.tab{border:1px solid var(--line-2);background:var(--panel);color:var(--ink);padding:7px 16px;border-radius:999px;font:inherit;font-weight:500;cursor:pointer}
+.tab[aria-selected="true"]{background:var(--accent);color:var(--accent-ink);border-color:var(--accent)}
+.tab:focus-visible,.btn:focus-visible,.step:focus-visible,input:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.kpis{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px}
+.kpi{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:12px 14px;min-width:0}
+.kpi .k{font-size:12px;color:var(--ink-3);letter-spacing:.04em}
+.kpi .v{font-size:24px;font-weight:700;margin-top:2px}
+.kpi .s{font-size:12px;color:var(--ink-2)}
+.pill{display:inline-block;font-size:11px;padding:1px 8px;border-radius:999px;margin-left:6px;vertical-align:3px;border:1px solid currentColor}
+.ok{color:var(--good)} .mid{color:var(--warn)} .ng{color:var(--bad)}
+.main{display:grid;grid-template-columns:340px minmax(0,1fr);gap:14px;align-items:start}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:14px;min-width:0}
+.card h2{font-size:15px;margin:0 0 10px;font-weight:700}
+.rows{display:flex;flex-direction:column;gap:8px}
+.lrow{display:grid;grid-template-columns:14px 72px 1fr;gap:8px;align-items:center}
+.sw{width:12px;height:12px;border-radius:3px}
+.lrow .lab{font-weight:500;white-space:nowrap}
+.stepper{display:flex;align-items:center;gap:4px;justify-content:flex-end}
+.step{min-width:30px;height:30px;padding:0 5px;white-space:nowrap;border:1px solid var(--line-2);background:var(--bg);color:var(--ink);border-radius:6px;font:inherit;font-size:12.5px;cursor:pointer;line-height:1}
+.stepper input{width:54px;height:30px;text-align:right;border:1px solid var(--line-2);background:var(--panel);color:var(--ink);border-radius:6px;font-family:var(--mono);font-size:14px;padding:0 6px}
+.lhint{grid-column:2 / 4;font-size:11.5px;color:var(--ink-3);margin-top:-4px}
+.total{display:flex;justify-content:space-between;border-top:1px solid var(--line);padding-top:8px;margin-top:2px;font-weight:700}
+.presets{display:flex;flex-wrap:wrap;gap:6px;margin-top:10px}
+.btn{border:1px solid var(--line-2);background:var(--bg);color:var(--ink);border-radius:6px;padding:6px 10px;font:inherit;font-size:12.5px;cursor:pointer}
+.btn.primary{background:var(--accent);color:var(--accent-ink);border-color:var(--accent);font-weight:700;padding:8px 14px;font-size:13.5px}
+.btn:disabled{opacity:.45;cursor:not-allowed}
+.slider{margin-top:14px;border-top:1px solid var(--line);padding-top:12px}
+.slider label{display:flex;justify-content:space-between;font-weight:500}
+.slider input{width:100%;accent-color:var(--accent)}
+.slider .hint{font-size:12px;color:var(--ink-2)}
+.mbtns{display:flex;flex-wrap:wrap;gap:6px;margin:8px 0 4px}
+.scope{display:flex;flex-wrap:wrap;align-items:center;gap:6px 8px;margin:-4px 0 14px}
+.scope .lab{font-size:12.5px;color:var(--ink-2);font-weight:500;margin-right:2px}
+.scope .btn[aria-pressed="true"]{background:var(--ink);color:var(--panel);border-color:var(--ink)}
+.scope .note{flex-basis:100%;margin:0}
+.mbtns .btn[aria-pressed="true"]{border-color:var(--accent);color:var(--ink);font-weight:700}
+.mbtns .btn:disabled{opacity:.5;cursor:default}
+.save{margin-top:14px;border-top:1px solid var(--line);padding-top:12px;display:flex;flex-direction:column;gap:6px}
+.save .st{font-size:12px;color:var(--ink-2)}
+.chartwrap{position:relative}
+svg{display:block;width:100%;height:auto}
+.legend{display:flex;flex-wrap:wrap;gap:6px 14px;font-size:12px;color:var(--ink-2);margin-top:6px}
+.legend button{display:inline-flex;align-items:center;gap:5px;background:none;border:0;color:inherit;font:inherit;cursor:pointer;padding:2px 0}
+.legend button[aria-pressed="true"]{color:var(--ink);font-weight:700;text-decoration:underline;text-underline-offset:3px}
+.tip{position:absolute;pointer-events:none;background:var(--panel);border:1px solid var(--line-2);border-radius:8px;padding:8px 10px;font-size:12px;box-shadow:0 4px 18px rgba(0,0,0,.12);min-width:180px;z-index:5}
+.tip table{border-collapse:collapse;width:100%}
+.tip td{padding:1px 0}
+.tip td.r{text-align:right;font-family:var(--mono);padding-left:12px}
+.tblwrap{overflow-x:auto}
+table.co{border-collapse:collapse;width:100%;min-width:760px;font-size:12.5px}
+table.co th,table.co td{border-bottom:1px solid var(--line);padding:6px 8px;text-align:right;white-space:nowrap}
+table.co th:first-child,table.co td:first-child{text-align:left}
+table.co thead th{color:var(--ink-3);font-weight:500;font-size:12px}
+table.co tbody tr{cursor:pointer}
+table.co tbody tr.sel td{outline:1px solid var(--accent);outline-offset:-1px}
+table.co tfoot td{font-weight:700}
+table.co td.fy{border-left:2px dashed var(--line-2)}
+.cell{border-radius:4px}
+.items{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:10px}
+.itm{border:1px solid var(--line);border-radius:8px;padding:10px;min-width:0}
+.itm h3{font-size:13px;margin:0 0 6px;display:flex;align-items:center;gap:6px}
+.chips{display:flex;flex-wrap:wrap;gap:4px}
+.chip{font-size:11.5px;background:var(--bg);border:1px solid var(--line);border-radius:999px;padding:1px 8px;color:var(--ink-2)}
+.note{font-size:12.5px;color:var(--ink-2)}
+details summary{cursor:pointer;font-weight:500}
+#method h3{font-size:14px;margin:18px 0 6px;font-weight:700}
+#method h3:first-of-type{margin-top:8px}
+#method p,#method li{font-size:13px;color:var(--ink-2);max-width:86ch}
+#method p{margin:0 0 6px}
+#method ul{margin:4px 0 6px;padding-left:20px}
+#method li{margin:0 0 4px}
+#method b{color:var(--ink);font-weight:700}
+#method .eq{display:inline-block;background:var(--bg);border:1px solid var(--line);border-radius:6px;padding:2px 8px;margin:2px 0;color:var(--ink);font-size:13px}
+#method table.co{min-width:720px}
+#method table.co tbody tr{cursor:default}
+details ul{margin:8px 0 0;padding-left:18px}
+@media (max-width:860px){.main{grid-template-columns:minmax(0,1fr)} .kpis{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media (prefers-reduced-motion:no-preference){.bar{transition:opacity .15s}}
+</style>
+<style>.save{display:none}</style>
+</head>
+<body>
+
+
+<div class="wrap">
+  <header>
+    <h1>新作の型数シミュレーター</h1>
+    <p class="sub">投入月ごとの型数を変えると、その型が何月にいくら売上になるか、目標にどこまで届くかが出ます。税抜。目標は「ブランド別売上予算_202601-202707」の予算（1〜7月）で、「ZOZO だけ」と「全モール」を切り替えられます。下の「作る量」に、この型数で仕込む枚数と仕入れ金額が出ます。当たりは「去年並み」と「今年のAW並み」を切り替えられます。数字の出し方は<a href="#method">ページの下</a>にまとめています。</p>
+  </header>
+
+  <div class="tabs" role="tablist" id="tabs"></div>
+  <div class="scope"><span class="lab">売上と目標</span><button class="btn" type="button" data-scope="zozo">ZOZO だけ</button><button class="btn" type="button" data-scope="all">全モール</button><span class="note" id="scopenote"></span></div>
+
+  <section class="kpis" id="kpis" aria-live="polite"></section>
+
+  <section class="main">
+    <div class="card">
+      <h2>投入する型数</h2>
+      <div class="rows" id="rows"></div>
+      <div class="total"><span>12〜5月の計</span><span class="num" id="ntotal"></span></div>
+      <div class="presets">
+        <button class="btn" type="button" data-preset="lastyear">去年と同じ（カレンダーどおり）</button>
+        <button class="btn" type="button" data-preset="guide">目安（月40型の配分）</button>
+        <button class="btn" type="button" data-preset="fill">不足を型数で埋める</button>
+      </div>
+      <div class="slider">
+        <label for="mult"><span>当たり（縦売り・中堅の割合）</span><span class="num" id="multv"></span></label>
+        <input type="range" id="mult" min="0.3" max="3" step="0.1" value="1">
+        <div class="mbtns"><button class="btn" type="button" id="m-ly">去年並み（×1.0）</button><button class="btn" type="button" id="m-awbtn">今年のAW並み</button></div>
+        <div class="hint" id="multhint"></div>
+      </div>
+      <div class="save">
+        <button class="btn primary" type="button" id="savebtn">この型数で決める</button>
+        <div class="st" id="savest">保存の準備をしています…</div>
+        <button class="btn" type="button" id="loadbtn" hidden>保存した型数に戻す</button>
+      </div>
+<p class="note" style="margin-top:14px">このページでは型数の保存はできません。動かした型数は、この端末のブラウザに残ります。</p>
+    </div>
+
+    <div class="card">
+      <h2>いつ売上になるか（月ごと）</h2>
+      <div class="chartwrap" id="chartwrap">
+        <svg id="chart" viewBox="0 0 760 380" role="img" aria-label="月ごとの売上の内訳と目標"></svg>
+        <div class="tip" id="tip" hidden></div>
+      </div>
+      <div class="legend" id="legend"></div>
+      <p class="note">投入月の色を押すと、その月に出した型の売上だけが目立ちます。黒い横線が目標です。</p>
+    </div>
+  </section>
+
+  <section class="card">
+    <h2>投入月ごとの売上の出方（万円）</h2>
+    <div class="tblwrap"><table class="co" id="cotable"></table></div>
+    <p class="note">行を押すと、上のグラフでその投入月が目立ちます。破線より右は来期（5〜7月）。</p>
+  </section>
+
+  <section class="card" id="make">
+    <h2>作る量（この型数で・全チャネル）</h2>
+    <p class="note">去年の新作が実際に何枚入荷したかを、縦売り・中堅・その他ごとに平均し、今の型数と当たりに掛けたものです。在庫は全チャネル共通なので、全チャネルの枚数です。</p>
+    <div class="tblwrap"><table class="co" id="maketable"></table></div>
+    <p class="note" id="makenote"></p>
+    <details>
+      <summary>去年の新作の入荷（1型あたりの平均）</summary>
+      <div class="tblwrap"><table class="co" id="makebase"></table></div>
+      <ul class="note">
+        <li>入荷は、売上推移表の週ごとの「今週の総在庫 − 先週の総在庫 ＋ 先週の売れ」です（取り置きは戻してあります）。</li>
+        <li>初回＝最初に入荷した週から4週以内の入荷。追加＝それより後、発売から9か月以内の入荷です。追加はほとんど当たった型で起きます。</li>
+        <li>下代は原価から出しています（原価150以下は元：元×26×1.1＋450、それより上は円：円＋450）。上代は売上推移表の売価です。</li>
+        <li>売れ残りは「入荷 − 発売から9か月で売れた枚数」です。発売が遅い型は9か月分見えていないので、売れた枚数は少なめに出ます。</li>
+      </ul>
+    </details>
+  </section>
+
+  <section class="card">
+    <h2>カレンダーで、その月に出すアイテム（括弧は去年の春夏の型数）</h2>
+    <div class="items" id="items"></div>
+  </section>
+
+  <section class="card">
+    <h2>当たり方の前提</h2>
+    <div class="tblwrap"><table class="co" id="tiertable"></table></div>
+    <p class="note" id="hits"></p>
+  </section>
+
+  <section class="card" id="method">
+    <h2>数字の出し方（予算の組み方）</h2>
+    <p>このページの数字は、次の8つの段階で出しています。表と例は、上で選んでいるブランド（<b id="m-brand"></b>）の値です。</p>
+
+    <h3>① 目標 ＝ ZOZO の月の予算 × ブランドの配分</h3>
+    <p>「ブランド別売上予算_202601-202707」の ZOZO の行（月ごとの予算）に、同じファイルの ZOZO のブランド配分（Futier Land 75%・ABYS 20%・STELLA FISH 5%）を掛けています。</p>
+    <p><span class="eq" id="m-eq"></span></p>
+    <p>同じファイルの楽天・SHOPLIST・YAHOO などほかのモールの行は入れていません。売上は ZOZO の売上集計（本店＋Yahoo 店・税抜）で比べています。</p>
+    <div class="tblwrap"><table class="co" id="m-target"></table></div>
+
+    <h3>② 既存品で作れる金額（グラフのグレーの部分）</h3>
+    <p>今の売上推移表（代表シート）に載っている、今も扱っている品番だけを、1品番ずつ見込んで足しています。品番は次の3つに分けています。</p>
+    <ul>
+      <li><b>去年からの品番・今年の春夏に出した品番の1月</b>：2026年10月の売上 × 季節の伸び。季節の伸びは、その品番自身の去年の「2026年1月 ÷ 2025年10月」です（去年10月に5万円以上売れていた品番だけ。0.2〜2倍に収める）。それ以外の品番は、同じ子カテゴリの品番の去年の比を使います。</li>
+      <li><b>同じ品番の2〜7月</b>：去年の同じ月に売れていた品番は「去年の同じ月の売上 × 2年目の残り方」です。2年目の残り方は、去年からある品番の売上が 2025年5〜7月 → 2026年5〜7月 でどれだけ残ったかの比です。<span id="m-ss"></span>去年の同じ月に売れていない今年の春夏の品番（2026年2〜7月発売）は「2026年5〜7月の月平均 × 季節の比 × 2年目の残り方」です。</li>
+      <li><b>今季すでに出した新作（2026年8月以降の発売）</b>：2026年10月の売上 × 去年の同じ時期（2025年8〜10月）に出した新作が、10月からその月までにどう推移したかの比です。<span id="m-coh"></span>11月に出た新作は10月の売上が無いので、0で数えています（控えめの見込み）。</li>
+    </ul>
+    <p id="m-stella"></p>
+
+    <h3>③ 新作で必要な金額 ＝ 目標 − 既存品</h3>
+    <p>月ごとに引き算しています（既存品が目標を超える月は0）。上の表の「新作で必要」の合計が、上の数字の「新作で必要」です。</p>
+
+    <h3>④ 新作の当たり方（去年の実績）</h3>
+    <p>2025年6月〜2026年7月に ZOZO で初めて売れた品番を「去年の新作」として、初めて売れた日から90日の売上で3つに分けました。</p>
+    <ul>
+      <li><b>縦売り</b>：90日で100万円以上　<b>中堅</b>：30万〜100万円　<b>その他</b>：30万円未満</li>
+      <li>初めて売れた月が8〜1月なら秋冬、2〜7月なら春夏の当たり方です。</li>
+      <li>区分ごとに「何型に1型その区分になったか（割合）」と、「発売月を0か月目として、何か月目にいくら売れたか」の平均を出しています。平均は、その月まで売れ行きが見えている型だけで出しています。割合は上の「当たり方の前提」の表です。</li>
+    </ul>
+
+    <h3>⑤ 新作の売上 ＝ 型数 × 区分の割合 × 何か月目の売上</h3>
+    <p>ある月に N 型出すと、そのうち「N × 縦売りの割合」の型が縦売りの売れ方で、「N × 中堅の割合」の型が中堅の売れ方で売れる、として月ごとに足しています。12月に出す型は秋冬、1〜5月に出す型は春夏の当たり方です。12月に出す型の12月中の売上は、目標が1月からなので数えていません。</p>
+    <p><span class="eq" id="m-e"></span></p>
+    <p>「当たり」のつまみは、縦売りと中堅の割合を同じ倍率で上げ、その分その他を減らします。当たった型1型あたりの売上は変えていません。</p>
+
+    <h3>⑥ 型数のひな形（3つのボタン）</h3>
+    <ul>
+      <li><b>去年と同じ（カレンダーどおり）</b>：時期別投入カレンダーのアイテムごとに、去年の春夏にそのアイテムで出した型数を、カレンダーの仕込みの月に置いたものです。梅春は12月と1月に半分ずつ、「下旬」は翌月から売れる扱いです。</li>
+      <li><b>目安（月40型の配分）</b>：12〜4月の合計を Futier Land 100型・ABYS 50型・STELLA FISH 50型にして、「去年と同じ」の月の山の形で配ったものです。</li>
+      <li><b>不足を型数で埋める</b>：「去年と同じ」の型数を全部の月で同じ倍率で増やし、今のつまみの当たりで、1〜7月の新作の売上の合計が新作で必要な金額の合計に届く、いちばん小さい倍率にしたものです（当たりを変えてから押すと、その当たりで計算し直します）。7か月の合計で届く数なので、月ごとには届かない月があります。</li>
+    </ul>
+
+    <h3>⑦ 今年のAW並みの当たり（「今年のAW並み」のボタン）</h3>
+    <p>今年のAWの新作の立ち上がりを、去年のAWと同じ条件で比べています。<span id="m-awrange"></span>に初めて売れた新作の、発売から<span id="m-awdays"></span>日の売上（ZOZO・税抜）です。</p>
+    <div class="tblwrap"><table class="co" id="m-aw"></table></div>
+    <p>ボタンの倍率は「30日で10万円以上売れた型の割合」が去年の何倍かを、0.1刻みにしたものです。当たりのつまみと同じく、縦売りと中堅の割合にこの倍率を掛け、その分その他を増やします。当たった型1型あたりの売上は変えていません。</p>
+    <p id="m-awnote"></p>
+    <p>見ているのは30日分だけで、型数も多くありません。当たるかどうかは数型で決まるので、ぶれが大きい数字です。また今年のAWの弱さには、商品・露出・値段も絡んでいます。なので、予測ではなく「春夏も今年のAWと同じ調子なら」という見方として使ってください。既存品の見込みは、11月1〜11日の実績が見込みのペースを上回っている（ABYS 1.7倍・Futier Land 1.35倍）ため、下げていません。</p>
+
+    <h3>⑧ 全モールで見るとき（上の「全モール」）</h3>
+    <p>目標は予算ファイルの全モール（SHOPLIST・ZOZO・楽天・YAHOO・楽天ファッション・ジェイド・Qoo10・TikTok）の予算に、それぞれのブランド配分を掛けて足したものです。売上の見込みは、ZOZO の見込みを「予算の中の ZOZO の割合」で割って全体に広げています。<span id="m-share"></span></p>
+    <p>目標と売上を同じ割合で広げるので、達成率は「ZOZO だけ」とほぼ同じです（月ごとに割合が違う分だけ少しずれます）。金額が全モールの大きさになります。ほかのモールが予算どおりの割合で売れる前提なので、実際の割合が違うと全体の見込みもずれます（STELLA FISH は予算の ZOZO の割合が実績より低く、楽天を大きく見ています）。</p>
+
+    <h3>注意すること</h3>
+    <ul>
+      <li>出ているのは平均（期待値）です。縦売りは数が少ないので、実際は何型当たるかで大きくぶれます。縦売りの平均は大当たりの型に引っぱられて、真ん中の型より高めです。</li>
+      <li>型を増やしても、1型あたりの売上は変わらない前提です（露出の取り合いは入っていません）。値下げ・TS・PR・在庫切れの効果も入っていません。</li>
+      <li>楽天などほかのモールの売上は入っていません。</li>
+      <li id="m-asof"></li>
+    </ul>
+  </section>
+
+</div>
+
+<script>
+const DATA = {"months":["2027-01","2027-02","2027-03","2027-04","2027-05","2027-06","2027-07"],"launch":["12","1","2","3","4","5"],"brands":[{"key":"futier","name":"Futier Land","target":[26250000,22500000,33750000,37500000,37500000,37500000,45000000],"existing":[12954109,13009126,19451644,12684597,16017484,10978277,12531988],"existingParts":{"継続（去年からの品番）":[6550536,9428284,15289384,10960634,14115811,9472054,9659235],"継続（今年の春夏に出した品番）":[1787125,1382297,1856009,941885,1780222,1457449,2835829],"今季の投入済み新作":[4616448,2198545,2306251,782077,121452,48775,36923]},"lastYear":[24983296,20287264,33355955,24482083,33296404,23228862,23822089],"profiles":{"秋冬":{"n":134,"p":{"縦売り":0.05970149253731343,"中堅":0.12686567164179105,"その他":0.8134328358208955},"avg90":{"縦売り":5511775,"中堅":466383,"その他":97499},"prof":{"縦売り":[886276,2347329,2119052,1561951,541351,302538,300193,123972,21990],"中堅":[53754,199986,142061,96723,46800,14879,14193,30498,17675],"その他":[20531,37260,28984,19364,9902,5959,5685,3384,2014]}},"春夏":{"n":184,"p":{"縦売り":0.03260869565217391,"中堅":0.06521739130434782,"その他":0.9021739130434783},"avg90":{"縦売り":2572884,"中堅":529434,"その他":58746},"prof":{"縦売り":[352478,988649,1128011,824462,487556,221989,155415,177336,51809],"中堅":[75395,256233,134533,90584,55290,23236,30595,14045,14803],"その他":[15112,22595,16580,10794,7224,5221,7600,10515,15976]}}},"presets":{"lastyear":{"12":9,"1":6,"2":43,"3":28,"4":56,"5":0},"guide":{"12":6,"1":4,"2":30,"3":21,"4":39,"5":0},"fill":{"12":37,"1":25,"2":174,"3":114,"4":227,"5":0}},"items":{"12":[["長袖ニット（梅春）",6],["長袖ワンピース（梅春）",2],["薄手スウェット・パーカー（梅春）",1]],"1":[["長袖ニット（梅春）",5],["長袖ワンピース（梅春）",1]],"2":[["長袖シャツ・通常シャツ",12],["スカート",9],["春ライトアウター・薄手ジャケット",8],["スラックス・きれいめパンツ",6],["薄手カーディガン・シアーカーデ",6],["長袖Tシャツ・ロンT",2]],"3":[["シアー・薄手シャツ・羽織りシャツ",9],["半袖・半端袖ニット・サマーニット",9],["カーゴパンツ・カジュアルパンツ",5],["半端袖Tシャツ・五分袖カットソー",2],["半端袖ワンピース",2],["半袖カーディガン",1]],"4":[["半袖Tシャツ・カットソー",16],["半袖シャツ・半袖ブラウス",9],["袖なしワンピース・キャミワンピ",8],["キャミソール",6],["サンダル",5],["袖なしニット・ニットベスト",4],["袖なしブラウス・ノースリブラウス",3],["半袖ワンピース",2],["袖なしTシャツ・ノースリトップス",2],["タンクトップ",1]]},"ratio":0.75,"aw":{"2025":{"n":51,"avg":215539,"med":39405,"hi":0.11764705882352941,"mid":0.21568627450980393},"2026":{"n":51,"avg":58336,"med":27818,"hi":0.058823529411764705,"mid":0.11764705882352941},"mult":0.5,"note":""},"total":[41831250,35075750,61042000,64083750,60796000,64922000,66645000],"malls":{"SHOPLIST":36002000,"ZOZO":240000000,"楽天":83980000,"YAHOO":2703750,"楽天F":11565000,"ジェイド":3585000,"qoo10":3645000,"TIKTOK":12915000},"arr":{"秋冬":{"縦売り":{"n":8,"init":1558.875,"add":5449.5,"cost":1873.897115950559,"price":5042.6195088019695,"sold":5110.75,"st":0.7292346656678617},"中堅":{"n":17,"init":577.9411764705883,"add":673.0588235294117,"cost":1587.879578689989,"price":4181.673719847651,"sold":864.7647058823529,"st":0.6912587576997226},"その他":{"n":108,"init":372.26851851851853,"add":311.44444444444446,"cost":1400.5675600276272,"price":3356.8847659159546,"sold":418.31481481481484,"st":0.6118281171706775},"_src":"秋冬"},"春夏":{"縦売り":{"n":6,"init":1138.5,"add":3610.0,"cost":1451.780976448703,"price":4005.4079533887893,"sold":2430.5,"st":0.5118458460566495},"中堅":{"n":12,"init":297.0833333333333,"add":316.25,"cost":1232.6709239130435,"price":3399.951766304348,"sold":323.75,"st":0.5278532608695652},"その他":{"n":165,"init":167.75757575757575,"add":73.68484848484849,"cost":1397.9000251016619,"price":3537.567397961745,"sold":129.5878787878788,"st":0.5367237311109996},"_src":"春夏"}},"fac":{"ssNew":0.23,"ssOld":0.56,"coh":[1.15,0.55,0.57,0.19,0.03,0.01,0.01]},"hits":[["13254001","【4色展開 / 風通し防止】プードルファージャケット",14643236,"2025-10"],["18254201","【7色展開】襟付きペプラムリブニットトップス/カーディガ",10897246,"2025-10"],["12253201","【6色展開】レイヤード風ロゴニットカーディガン",7127413,"2025-09"],["12261402","【裏地あり】ゆれるたびに、きれいなシルエット。 ウエスト",5467523,"2026-03"],["12234402","【新色追加】まるで毛布！裏起毛ニットロングスカート",5188898,"2025-10"],["13261219","【レイヤード対応】裾レースアシンメトリータンクトップ /",3048852,"2026-04"]],"zshare":[0.6275,0.6415,0.5529,0.5852,0.6168,0.5776,0.6752]},{"key":"abys","name":"ABYS","target":[7000000,6000000,9000000,10000000,10000000,10000000,12000000],"existing":[4113767,4136686,2128644,1213510,2491359,1637572,3121540],"existingParts":{"継続（去年からの品番）":[2406912,2604919,1007102,528072,712783,457961,426844],"継続（今年の春夏に出した品番）":[373615,420880,593719,519182,1717357,1157880,2681683],"今季の投入済み新作":[1333240,1110886,527823,166256,61219,21731,13014]},"lastYear":[8861269,10161613,5912495,4005963,7894516,6203714,8994924],"profiles":{"秋冬":{"n":52,"p":{"縦売り":0.09615384615384616,"中堅":0.2692307692307692,"その他":0.6346153846153846},"avg90":{"縦売り":3583179,"中堅":467021,"その他":95795},"prof":{"縦売り":[358748,1340102,1658722,965684,713542,227788,132908,99719,12636],"中堅":[70557,177970,146351,138262,69553,38006,18698,8938,3477],"その他":[19993,39488,26759,24422,20950,19548,10870,7055,5423]}},"春夏":{"n":49,"p":{"縦売り":0.08163265306122448,"中堅":0.14285714285714285,"その他":0.7755102040816326},"avg90":{"縦売り":2829144,"中堅":572412,"その他":84681},"prof":{"縦売り":[268485,713710,843036,1316524,437268,37328,4280,1148,8038],"中堅":[145341,162684,153826,269153,110239,147304,78742,104238,156569],"その他":[17406,35660,25604,13109,6792,5560,5696,12768,17575]}}},"presets":{"lastyear":{"12":6,"1":5,"2":12,"3":8,"4":16,"5":0},"guide":{"12":6,"1":5,"2":13,"3":9,"4":17,"5":0},"fill":{"12":11,"1":10,"2":22,"3":15,"4":30,"5":0}},"items":{"12":[["長袖ニット（梅春）",6]],"1":[["長袖ニット（梅春）",5]],"2":[["薄手カーディガン・シアーカーデ",6],["長袖シャツ・通常シャツ",3],["長袖Tシャツ・ロンT",2],["春ライトアウター・薄手ジャケット",1]],"3":[["カーゴパンツ・カジュアルパンツ",6],["シアー・薄手シャツ・羽織りシャツ",2]],"4":[["半袖Tシャツ・カットソー",9],["キャミソール",2],["半袖シャツ・半袖ブラウス",2],["袖なしニット・ニットベスト",2],["タンクトップ",1]]},"ratio":0.2,"aw":{"2025":{"n":27,"avg":129288,"med":42990,"hi":0.1111111111111111,"mid":0.2962962962962963},"2026":{"n":17,"avg":40580,"med":30393,"hi":0.0,"mid":0.11764705882352941},"mult":0.4,"note":""},"total":[7411000,6432000,9644000,10770000,10634500,10824000,12725000],"malls":{"SHOPLIST":1149000,"ZOZO":64000000,"YAHOO":721000,"楽天F":642500,"ジェイド":956000,"qoo10":972000},"arr":{"秋冬":{"縦売り":{"n":5,"init":1153.8,"add":1008.6,"cost":1771.7844987051424,"price":4979.291157972623,"sold":1515.0,"st":0.7006104328523862},"中堅":{"n":14,"init":238.71428571428572,"add":51.07142857142857,"cost":1930.2139018979547,"price":5042.688686221346,"sold":202.35714285714286,"st":0.6982992358885877},"その他":{"n":32,"init":148.1875,"add":23.8125,"cost":1798.1779069767445,"price":4621.970566860465,"sold":74.3125,"st":0.4320494186046512},"_src":"秋冬"},"春夏":{"縦売り":{"n":4,"init":596.5,"add":1083.0,"cost":1389.0659720154806,"price":3682.454004167907,"sold":1255.0,"st":0.7472462042274487},"中堅":{"n":7,"init":517.5714285714286,"add":439.14285714285717,"cost":1857.2720322532477,"price":4979.3310437509335,"sold":343.7142857142857,"st":0.35926534269075705},"その他":{"n":36,"init":226.19444444444446,"add":28.72222222222222,"cost":1455.4752751443827,"price":3851.8659692710035,"sold":50.94444444444444,"st":0.19984744469870327},"_src":"春夏"}},"fac":{"ssNew":0.47,"ssOld":0.15,"coh":[1.76,1.47,0.7,0.22,0.08,0.03,0.02]},"hits":[["58253201","《26AW 新色追加》襟付きボーダーニット",8427701,"2025-10"],["50261208","着るだけで細見え。ポコポコストライプシャーリングシャツ ",6238983,"2026-04"],["58254103","《26AW 新作》配色ステッチニットカーディガン",3825066,"2025-12"],["50253106","【新色追加】ロゴ刺繍裏起毛ショート丈トレーナー",2978431,"2025-10"],["18252203","レトロに着映える。半袖ポロニット / サマーニット・襟付",2114464,"2025-06"],["12242208","FUNNYロゴプリント半袖Tシャツ",1719070,"2025-06"]],"zshare":[0.9445,0.9328,0.9332,0.9285,0.9403,0.9239,0.943]},{"key":"stella","name":"STELLA FISH","target":[1750000,1500000,2250000,2500000,2500000,2500000,3000000],"existing":[1833363,1008674,936482,398514,410735,420713,711381],"existingParts":{"継続（去年からの品番）":[0,0,0,0,0,0,0],"継続（今年の春夏に出した品番）":[528935,203989,338108,200507,366340,403985,700042],"今季の投入済み新作":[1304427,804685,598374,198007,44395,16729,11339]},"lastYear":[19912,5592,900,23708,686137,1234102,2259409],"profiles":{"秋冬":{"n":57,"p":{"縦売り":0.017543859649122806,"中堅":0.12280701754385964,"その他":0.8596491228070176},"avg90":{"縦売り":1450804,"中堅":516273,"その他":32973},"prof":{"縦売り":[159423,323009,907247,921156,null,null,null,null,null],"中堅":[58830,186651,166085,139720,112803,37356,13118,null,null],"その他":[10450,11989,7153,5657,3731,1343,1203,67,75]}},"春夏":{"n":52,"p":{"縦売り":0.019230769230769232,"中堅":0.1346153846153846,"その他":0.8461538461538461},"avg90":{"縦売り":1450804,"中堅":516273,"その他":35731},"prof":{"縦売り":[159423,323009,907247,921156,null,null,null,null,null],"中堅":[58830,186651,166085,139720,112803,37356,13118,null,null],"その他":[10817,13222,7927,6150,4197,1583,1490,85,95]}}},"presets":{"lastyear":{"12":0,"1":0,"2":4,"3":8,"4":18,"5":0},"guide":{"12":0,"1":0,"2":7,"3":13,"4":30,"5":0},"fill":{"12":0,"1":0,"2":9,"3":18,"4":39,"5":0}},"items":{"12":[],"1":[],"2":[["スカート",2],["スラックス・きれいめパンツ",1],["薄手カーディガン・シアーカーデ",1]],"3":[["カーゴパンツ・カジュアルパンツ",7],["半袖カーディガン",1]],"4":[["半袖Tシャツ・カットソー",8],["半袖ワンピース",3],["袖なしTシャツ・ノースリトップス",2],["袖なしニット・ニットベスト",2],["袖なしブラウス・ノースリブラウス",2],["半袖シャツ・半袖ブラウス",1]]},"ratio":0.05,"aw":{"2025":{"n":3,"avg":7902,"med":5427,"hi":0.0,"mid":0.0},"2026":{"n":19,"avg":35472,"med":23058,"hi":0.0,"mid":0.05263157894736842},"mult":null,"note":"去年のAWの新作が3型しかなく、比べられません。"},"total":[3662750,2957250,5914000,5571250,5319500,5854000,5430000],"malls":{"SHOPLIST":1149000,"ZOZO":16000000,"楽天":14820000,"YAHOO":180250,"楽天F":642500,"ジェイド":239000,"qoo10":243000,"TIKTOK":1435000},"arr":{"秋冬":{"縦売り":{"n":1,"init":494.0,"add":3607.0,"cost":650.2,"price":2445.0,"sold":1329.0,"st":0.324067300658376},"中堅":{"n":7,"init":401.14285714285717,"add":241.0,"cost":1313.4718576195776,"price":3769.717463848721,"sold":267.2857142857143,"st":0.4162402669632925},"その他":{"n":37,"init":109.0,"add":19.18918918918919,"cost":1705.5464473961629,"price":4654.83238456673,"sold":23.945945945945947,"st":0.18680160236137466},"_src":"通年"},"春夏":{"縦売り":{"n":1,"init":494.0,"add":3607.0,"cost":650.2,"price":2445.0,"sold":1329.0,"st":0.324067300658376},"中堅":{"n":7,"init":401.14285714285717,"add":241.0,"cost":1313.4718576195776,"price":3769.717463848721,"sold":267.2857142857143,"st":0.4162402669632925},"その他":{"n":35,"init":114.51428571428572,"add":19.685714285714287,"cost":1694.142388758782,"price":4620.37726208218,"sold":25.314285714285713,"st":0.1886310410900575},"_src":"春夏"}},"fac":{"ssNew":0.31,"ssOld":0.55,"coh":[1.33,0.82,0.61,0.2,0.04,0.02,0.01]},"hits":[["14261810","ボタニカル大判スカーフ",1450804,"2026-07"]],"zshare":[0.4778,0.5072,0.3805,0.4487,0.47,0.4271,0.5525]}],"zozo":[35000000,30000000,45000000,50000000,50000000,50000000,60000000],"asof":"売上集計 2026年11月11日まで・売上推移表 2026/11/9 版","aw":{"days":30,"range":"8/1〜10/12"}};
+const MONTH_LABEL = m => (+m.slice(5)) + "月";
+const LAUNCH = DATA.launch;                       // ["12","1","2","3","4","5"]
+const LIDX = {"12":-1,"1":0,"2":1,"3":2,"4":3,"5":4}; // 投入月 → 売上月の位置（売上月は1〜7月。12月に出す型は1月から数える）
+const TIERS = ["縦売り","中堅","その他"];
+const FY_END = 3;                                 // 0..3 が今期（1〜4月）
+const man = v => (Math.round(v/1e4)).toLocaleString("ja-JP");
+const yen = v => "¥" + man(v) + "万";
+const pct = v => (v*100).toFixed(0) + "%";
+const css = n => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+const SERIES = LAUNCH.map((_,i) => "--s"+i);
+
+const state = {b:0, n:{}, mult:{}, focus:null, saved:{}};
+DATA.brands.forEach((b,i) => { state.n[i] = {...b.presets.guide}; state.mult[i] = 1; });
+state.scope = "zozo";
+try { const s = JSON.parse(localStorage.getItem("katasu-sim-2027")||"null"); if (s && s.n) { Object.assign(state.n, s.n); Object.assign(state.mult, s.mult||{}); state.b = s.b||0; if (s.scope) state.scope = s.scope; } } catch(e){}
+const remember = () => { try { localStorage.setItem("katasu-sim-2027", JSON.stringify({b:state.b, n:state.n, mult:state.mult, scope:state.scope})); } catch(e){} };
+
+// 表示用のブランド：全モールのときは目標を全モールの予算に、既存品を「÷ 予算の ZOZO の割合」で全体に広げる
+const ALL = () => state.scope === "all";
+const SC = (bi, m) => ALL() ? 1 / DATA.brands[bi].zshare[m] : 1;
+function VB(bi){ const b = DATA.brands[bi]; if (!ALL()) return b;
+  const ex = {}; Object.keys(b.existingParts).forEach(k => ex[k] = b.existingParts[k].map((v,m) => v * SC(bi,m)));
+  return {...b, target: b.total, existing: b.existing.map((v,m) => v * SC(bi,m)), existingParts: ex}; }
+// 当たりの倍率を掛けた区分の割合
+function probs(pr, mult){ let tv = pr.p["縦売り"]*mult, cv = pr.p["中堅"]*mult;
+  if (tv + cv > 1) { const s = tv + cv; tv /= s; cv /= s; }
+  return {縦売り:tv, 中堅:cv, その他:Math.max(0, 1 - tv - cv)}; }
+function compute(bi){
+  const b = VB(bi), n = state.n[bi], mult = state.mult[bi], M = DATA.months.length;
+  const contrib = LAUNCH.map(() => new Array(M).fill(0));
+  const tierN = {縦売り:0,中堅:0,その他:0}, tierAmt = {縦売り:0,中堅:0,その他:0}, tierAmtFY = {縦売り:0,中堅:0,その他:0};
+  LAUNCH.forEach((lm, li) => {
+    const cnt = +n[lm] || 0; if (!cnt) return;
+    const pr = b.profiles[li === 0 ? "秋冬" : "春夏"];
+    let tv = pr.p["縦売り"]*mult, cv = pr.p["中堅"]*mult;
+    if (tv + cv > 1) { const s = tv + cv; tv /= s; cv /= s; }
+    const p = {縦売り:tv, 中堅:cv, その他:Math.max(0, 1 - tv - cv)};
+    TIERS.forEach(t => tierN[t] += cnt * p[t]);
+    for (let m = Math.max(0, LIDX[lm]); m < M; m++) {
+      const k = m - LIDX[lm]; if (k > 8) break;
+      TIERS.forEach(t => { const v = (pr.prof[t][k] || 0) * p[t] * cnt * SC(bi, m); contrib[li][m] += v; tierAmt[t] += v; if (m <= FY_END) tierAmtFY[t] += v; });
+    }
+  });
+  const newM = DATA.months.map((_,m) => contrib.reduce((a,r) => a + r[m], 0));
+  const total = newM.map((v,m) => v + b.existing[m]);
+  const sum = (arr, a, z) => arr.slice(a, z+1).reduce((x,y) => x + y, 0);
+  return {contrib, newM, total, tierN, tierAmt, tierAmtFY,
+          fy: sum(total,0,FY_END) / sum(b.target,0,FY_END), all: sum(total,0,M-1) / sum(b.target,0,M-1),
+          newAll: sum(newM,0,M-1), gapAll: sum(b.target,0,M-1) - sum(b.existing,0,M-1)};
+}
+const grade = r => r >= 1 ? ["ok","届く"] : r >= 0.85 ? ["mid","あと少し"] : ["ng","足りない"];
+
+function renderTabs(){
+  const el = document.getElementById("tabs"); el.innerHTML = "";
+  DATA.brands.forEach((b,i) => {
+    const t = document.createElement("button"); t.type="button"; t.className="tab"; t.role="tab"; t.id="tab-"+b.key;
+    t.textContent = b.name; t.setAttribute("aria-selected", i===state.b);
+    t.onclick = () => { state.b = i; state.focus = null; remember(); renderAll(); };
+    el.appendChild(t);
+  });
+}
+function renderRows(){
+  const b = DATA.brands[state.b], n = state.n[state.b];
+  const el = document.getElementById("rows"); el.innerHTML = "";
+  LAUNCH.forEach((lm, li) => {
+    const r = document.createElement("div"); r.className = "lrow";
+    const items = (b.items[lm] || []).slice(0,3).map(x => x[0]).join("・");
+    r.innerHTML = `<span class="sw" style="background:var(${SERIES[li]})"></span><span class="lab">${lm}月に出す</span>
+      <span class="stepper"><button class="step" type="button" aria-label="${lm}月を5型減らす" data-d="-5">−5</button><button class="step" type="button" aria-label="${lm}月を1型減らす" data-d="-1">−</button>
+      <input id="n-${lm}" type="number" min="0" max="999" inputmode="numeric" value="${n[lm]||0}" aria-label="${lm}月に出す型数"><button class="step" type="button" aria-label="${lm}月を1型増やす" data-d="1">＋</button><button class="step" type="button" aria-label="${lm}月を5型増やす" data-d="5">＋5</button></span>
+      <span class="lhint">${items ? "カレンダー：" + items + ((b.items[lm]||[]).length > 3 ? " ほか" : "") : (lm === "5" ? "カレンダー外（夏物の追加・実需フォロー）" : "カレンダー：該当なし")}</span>`;
+    const inp = r.querySelector("input");
+    inp.addEventListener("input", () => { n[lm] = Math.max(0, Math.min(999, parseInt(inp.value || "0", 10) || 0)); remember(); renderCalc(); });
+    r.querySelectorAll(".step").forEach(btn => btn.addEventListener("click", () => { n[lm] = Math.max(0, Math.min(999, (n[lm]||0) + (+btn.dataset.d))); inp.value = n[lm]; remember(); renderCalc(); }));
+    el.appendChild(r);
+  });
+  const m = document.getElementById("mult"); m.value = state.mult[state.b];
+}
+function renderKpis(c){
+  const b = VB(state.b);
+  const [g1,l1] = grade(c.fy), [g2,l2] = grade(c.all);
+  const k = document.getElementById("kpis");
+  k.innerHTML = `
+   <div class="kpi"><div class="k">今期（1〜4月）の${ALL() ? "全モールの" : "ZOZO の"}目標に対して</div><div class="v num ${g1}">${pct(c.fy)}<span class="pill">${l1}</span></div><div class="s">目標 ${yen(b.target.slice(0,FY_END+1).reduce((a,v)=>a+v,0))}</div></div>
+   <div class="kpi"><div class="k">1〜7月の${ALL() ? "全モールの" : "ZOZO の"}目標に対して</div><div class="v num ${g2}">${pct(c.all)}<span class="pill">${l2}</span></div><div class="s">新作の売上 ${yen(c.newAll)} ／ 新作で必要 ${yen(c.gapAll)}</div></div>
+   <div class="kpi"><div class="k">縦売りの見込み（1〜7月）</div><div class="v num">${c.tierN["縦売り"].toFixed(1)}<span style="font-size:14px;font-weight:500">型</span></div><div class="s">売上 ${yen(c.tierAmt["縦売り"])}（90日100万円以上）</div></div>
+   <div class="kpi"><div class="k">中堅の見込み（1〜7月）</div><div class="v num">${c.tierN["中堅"].toFixed(1)}<span style="font-size:14px;font-weight:500">型</span></div><div class="s">売上 ${yen(c.tierAmt["中堅"])}・その他 ${c.tierN["その他"].toFixed(0)}型 ${yen(c.tierAmt["その他"])}</div></div>`;
+}
+function niceMax(v){ const e = Math.pow(10, Math.floor(Math.log10(v))); const f = v / e; return (f <= 1 ? 1 : f <= 2 ? 2 : f <= 2.5 ? 2.5 : f <= 5 ? 5 : 10) * e; }
+function renderChart(c){
+  const b = VB(state.b), svg = document.getElementById("chart");
+  const W = 760, H = 380, ml = 58, mr = 12, mt = 26, mb = 40, M = DATA.months.length;
+  const vmax = niceMax(Math.max(...b.target, ...c.total) * 1.08);
+  const x0 = i => ml + (W - ml - mr) / M * i, bw = (W - ml - mr) / M * 0.62, off = (W - ml - mr) / M * 0.19;
+  const y = v => mt + (H - mt - mb) * (1 - v / vmax);
+  const ink3 = css("--ink-3"), line = css("--line"), ink2 = css("--ink-2");
+  let s = "";
+  for (let i = 0; i <= 5; i++) { const v = vmax / 5 * i, yy = y(v);
+    s += `<line x1="${ml}" x2="${W-mr}" y1="${yy}" y2="${yy}" stroke="${line}" stroke-width="1"/>`;
+    s += `<text x="${ml-8}" y="${yy+4}" text-anchor="end" font-size="11" fill="${ink3}" font-family="var(--mono)">${man(v)}万</text>`; }
+  const fx = x0(FY_END + 1) - 2;
+  s += `<line x1="${fx}" x2="${fx}" y1="${mt-14}" y2="${H-mb}" stroke="${css("--line-2")}" stroke-dasharray="4 4"/>`;
+  s += `<text x="${fx-6}" y="${mt-6}" text-anchor="end" font-size="11" fill="${ink2}">← 今期（4月決算）</text><text x="${fx+6}" y="${mt-6}" font-size="11" fill="${ink2}">来期（5〜7月）→</text>`;
+  DATA.months.forEach((m, i) => {
+    const bx = x0(i) + off; let acc = 0;
+    const seg = (v, color, key) => { if (v <= 0) return ""; const y1 = y(acc + v), h = y(acc) - y1; acc += v;
+      const dim = state.focus !== null && key !== state.focus ? 0.22 : 1;
+      return `<rect class="bar" x="${bx}" y="${y1}" width="${bw}" height="${Math.max(0, h - 1.5)}" rx="2" fill="${color}" opacity="${dim}"/>`; };
+    s += seg(b.existing[i], css("--exist"), "exist");
+    LAUNCH.forEach((lm, li) => { s += seg(c.contrib[li][i], css(SERIES[li]), li); });
+    const ty = y(b.target[i]);
+    s += `<line x1="${bx-6}" x2="${bx+bw+6}" y1="${ty}" y2="${ty}" stroke="${css("--target")}" stroke-width="2.5"/>`;
+    s += `<text x="${bx+bw/2}" y="${H-mb+18}" text-anchor="middle" font-size="12" fill="${ink2}">${MONTH_LABEL(m)}</text>`;
+    const r = c.total[i] / b.target[i];
+    s += `<text x="${bx+bw/2}" y="${Math.min(ty, y(c.total[i])) - 6}" text-anchor="middle" font-size="11" font-family="var(--mono)" fill="${r >= 1 ? css("--good") : ink2}">${pct(r)}</text>`;
+    s += `<rect x="${x0(i)}" y="${mt}" width="${(W-ml-mr)/M}" height="${H-mt-mb}" fill="transparent" data-i="${i}" class="hit"/>`;
+  });
+  svg.innerHTML = s;
+  const tip = document.getElementById("tip"), wrap = document.getElementById("chartwrap");
+  svg.querySelectorAll(".hit").forEach(h => {
+    const show = ev => { const i = +h.dataset.i, m = DATA.months[i];
+      let rows = `<tr><td><b>${MONTH_LABEL(m)}</b></td><td class="r">万円</td></tr><tr><td>既存品</td><td class="r">${man(b.existing[i])}</td></tr>`;
+      LAUNCH.forEach((lm, li) => { if (c.contrib[li][i] > 0) rows += `<tr><td><span class="sw" style="display:inline-block;background:var(${SERIES[li]});margin-right:5px"></span>${lm}月に出した型</td><td class="r">${man(c.contrib[li][i])}</td></tr>`; });
+      rows += `<tr><td><b>合計</b></td><td class="r"><b>${man(c.total[i])}</b></td></tr><tr><td>目標</td><td class="r">${man(b.target[i])}</td></tr><tr><td>差</td><td class="r">${(c.total[i]-b.target[i] >= 0 ? "+" : "") + man(c.total[i]-b.target[i])}</td></tr>`;
+      tip.innerHTML = `<table>${rows}</table>`; tip.hidden = false;
+      const rc = wrap.getBoundingClientRect(), px = (ev.clientX || rc.left + rc.width/2) - rc.left;
+      tip.style.left = Math.max(4, Math.min(rc.width - 200, px + 12)) + "px"; tip.style.top = "8px"; };
+    h.addEventListener("mousemove", show); h.addEventListener("click", show);
+    h.addEventListener("mouseleave", () => tip.hidden = true);
+  });
+  const lg = document.getElementById("legend");
+  lg.innerHTML = `<span><span class="sw" style="display:inline-block;background:var(--exist);margin-right:5px;vertical-align:-1px"></span>既存品</span>` +
+    LAUNCH.map((lm, li) => `<button type="button" data-li="${li}" aria-pressed="${state.focus === li}"><span class="sw" style="background:var(${SERIES[li]})"></span>${lm}月に出す型（${state.n[state.b][lm]||0}型）</button>`).join("") +
+    `<span><span style="display:inline-block;width:16px;border-top:2.5px solid var(--target);vertical-align:3px;margin-right:5px"></span>目標</span>`;
+  lg.querySelectorAll("button").forEach(bt => bt.onclick = () => { const li = +bt.dataset.li; state.focus = state.focus === li ? null : li; renderCalc(); });
+}
+function renderTable(c){
+  const b = VB(state.b), M = DATA.months.length, n = state.n[state.b];
+  const mx = Math.max(1, ...c.contrib.flat());
+  let h = `<thead><tr><th>投入月</th><th>型数</th>${DATA.months.map((m,i) => `<th class="${i===FY_END+1?'fy':''}">${MONTH_LABEL(m)}</th>`).join("")}<th>1〜4月</th><th>1〜7月</th></tr></thead><tbody>`;
+  LAUNCH.forEach((lm, li) => {
+    const row = c.contrib[li], fy = row.slice(0,FY_END+1).reduce((a,v)=>a+v,0), al = row.reduce((a,v)=>a+v,0);
+    h += `<tr data-li="${li}" class="${state.focus===li?'sel':''}"><td><span class="sw" style="display:inline-block;background:var(${SERIES[li]});margin-right:6px;vertical-align:-1px"></span>${lm}月に出す</td><td class="num">${n[lm]||0}</td>` +
+      row.map((v,i) => `<td class="num ${i===FY_END+1?'fy':''}"><span class="cell" style="padding:1px 6px;background:color-mix(in srgb, var(${SERIES[li]}) ${Math.round(v/mx*55)}%, transparent)">${v>0?man(v):"–"}</span></td>`).join("") +
+      `<td class="num">${man(fy)}</td><td class="num">${man(al)}</td></tr>`;
+  });
+  const sumr = (arr) => `${arr.map((v,i) => `<td class="num ${i===FY_END+1?'fy':''}">${man(v)}</td>`).join("")}<td class="num">${man(arr.slice(0,FY_END+1).reduce((a,v)=>a+v,0))}</td><td class="num">${man(arr.reduce((a,v)=>a+v,0))}</td>`;
+  const diff = c.total.map((v,i) => v - b.target[i]);
+  h += `</tbody><tfoot><tr><td>新作 計</td><td class="num">${LAUNCH.reduce((a,lm)=>a+(+n[lm]||0),0)}</td>${sumr(c.newM)}</tr>
+    <tr><td>既存品</td><td></td>${sumr(b.existing)}</tr><tr><td>合計</td><td></td>${sumr(c.total)}</tr><tr><td>目標</td><td></td>${sumr(b.target)}</tr>
+    <tr><td>差（合計−目標）</td><td></td>${diff.map((v,i) => `<td class="num ${v>=0?'ok':'ng'} ${i===FY_END+1?'fy':''}">${(v>=0?"+":"")+man(v)}</td>`).join("")}<td class="num">${man(diff.slice(0,FY_END+1).reduce((a,v)=>a+v,0))}</td><td class="num">${man(diff.reduce((a,v)=>a+v,0))}</td></tr></tfoot>`;
+  const t = document.getElementById("cotable"); t.innerHTML = h;
+  t.querySelectorAll("tbody tr").forEach(tr => tr.onclick = () => { const li = +tr.dataset.li; state.focus = state.focus === li ? null : li; renderCalc(); });
+}
+function renderItems(){
+  const b = DATA.brands[state.b], el = document.getElementById("items");
+  el.innerHTML = LAUNCH.filter(lm => (b.items[lm]||[]).length).map(lm => `<div class="itm"><h3><span class="sw" style="background:var(${SERIES[LAUNCH.indexOf(lm)]})"></span>${lm}月に出す</h3><div class="chips">${b.items[lm].map(x => `<span class="chip">${x[0]}（${x[1]}）</span>`).join("")}</div></div>`).join("") || `<p class="note">カレンダーに該当するアイテムがありません。</p>`;
+}
+function renderTiers(){
+  const b = DATA.brands[state.b], m = state.mult[state.b];
+  let h = `<thead><tr><th>季節</th><th>新作の型数（去年）</th>${TIERS.map(t => `<th>${t}の割合</th>`).join("")}${TIERS.map(t => `<th>${t} 90日の平均</th>`).join("")}</tr></thead><tbody>`;
+  ["秋冬","春夏"].forEach(se => { const p = b.profiles[se];
+    h += `<tr><td>${se}${se==="秋冬"?"（12月に出す型）":"（1〜5月に出す型）"}</td><td class="num">${p.n}</td>${TIERS.map(t => `<td class="num">${(p.p[t]*100).toFixed(1)}%</td>`).join("")}${TIERS.map(t => `<td class="num">${p.avg90[t] ? yen(p.avg90[t]) : "–"}</td>`).join("")}</tr>`; });
+  document.getElementById("tiertable").innerHTML = h + "</tbody>";
+  document.getElementById("hits").textContent = b.hits.length ? "去年の縦売りの例：" + b.hits.map(x => `${x[1]}（${x[0]}・90日 ${yen(x[2])}）`).join("、") : "去年の新作に縦売りはありませんでした。";
+  const ss = b.profiles["春夏"].p;
+  document.getElementById("multv").textContent = "×" + (+m).toFixed(1);
+  const aw = b.aw.mult, isAw = aw != null && Math.abs(m - aw) < 0.001, isLy = Math.abs(m - 1) < 0.001;
+  document.getElementById("multhint").textContent = `春夏の縦売り ${(ss["縦売り"]*m*100).toFixed(1)}%・中堅 ${(ss["中堅"]*m*100).toFixed(1)}%（去年は ${(ss["縦売り"]*100).toFixed(1)}%・${(ss["中堅"]*100).toFixed(1)}%）` + (isAw ? "　今年のAW並み" : isLy ? "　去年並み" : "");
+  const ab = document.getElementById("m-awbtn");
+  ab.textContent = aw != null ? `今年のAW並み（×${aw.toFixed(1)}）` : "今年のAW並み（比べられない）";
+  ab.disabled = aw == null; ab.title = aw != null ? "" : b.aw.note;
+  ab.setAttribute("aria-pressed", isAw); document.getElementById("m-ly").setAttribute("aria-pressed", isLy);
+}
+function renderSave(){
+  const b = DATA.brands[state.b], sv = state.saved[b.key], st = document.getElementById("savest"), lb = document.getElementById("loadbtn");
+  if (!DB) { st.textContent = DB === null ? "この表示では保存できません（ログインした状態で開くと保存できます）。型数はこの端末に残ります。" : "保存の準備をしています…"; document.getElementById("savebtn").disabled = DB === null; lb.hidden = true; return; }
+  document.getElementById("savebtn").disabled = false;
+  if (sv && sv.types) {
+    const d = sv.savedAt ? new Date(sv.savedAt) : null;
+    st.textContent = `決めた型数：${LAUNCH.map(lm => lm + "月" + (sv.types[lm]||0)).join("・")}（計${LAUNCH.reduce((a,lm)=>a+(sv.types[lm]||0),0)}型・当たり×${(+sv.mult||1).toFixed(1)}）` + (d ? `　${d.getMonth()+1}/${d.getDate()} ${String(d.getHours()).padStart(2,"0")}:${String(d.getMinutes()).padStart(2,"0")} 保存` : "");
+    lb.hidden = false;
+  } else { st.textContent = "まだ決めた型数はありません。決めた型数は保存され、次の作業（カテゴリへの落とし込み）に使います。"; lb.hidden = true; }
+}
+function renderCalc(){ const c = compute(state.b); renderKpis(c); renderChart(c); renderTable(c); renderTiers(); renderMake();
+  document.getElementById("ntotal").textContent = LAUNCH.reduce((a,lm)=>a+(+state.n[state.b][lm]||0),0) + "型"; renderSave(); }
+function renderMethod(){
+  const b = DATA.brands[state.b], M = DATA.months.length;
+  const ex = b.existingParts, K = ["継続（去年からの品番）", "継続（今年の春夏に出した品番）", "今季の投入済み新作"];
+  document.getElementById("m-brand").textContent = b.name;
+  const pctr = Math.round(b.ratio * 100);
+  document.getElementById("m-eq").textContent = `${b.name} の1月 ＝ ${man(DATA.zozo[0])}万円 × ${pctr}% ＝ ${man(b.target[0])}万円`;
+  let h = `<thead><tr><th>月</th><th>ZOZO の予算</th><th>配分</th><th>目標</th><th>既存品：去年からの品番</th><th>今年の春夏の品番</th><th>今季の新作</th><th>既存品 計</th><th>新作で必要</th></tr></thead><tbody>`;
+  let tz = 0, tt = 0, te = [0,0,0], tx = 0, tg = 0;
+  DATA.months.forEach((m, i) => {
+    const e = K.map(k => ex[k][i] || 0), es = b.existing[i], g = Math.max(0, b.target[i] - es);
+    tz += DATA.zozo[i]; tt += b.target[i]; e.forEach((v,j) => te[j] += v); tx += es; tg += g;
+    h += `<tr><td>${MONTH_LABEL(m)}</td><td class="num">${man(DATA.zozo[i])}</td><td class="num">${pctr}%</td><td class="num">${man(b.target[i])}</td>${e.map(v => `<td class="num">${man(v)}</td>`).join("")}<td class="num">${man(es)}</td><td class="num">${man(g)}</td></tr>`;
+  });
+  h += `</tbody><tfoot><tr><td>1〜7月</td><td class="num">${man(tz)}</td><td></td><td class="num">${man(tt)}</td>${te.map(v => `<td class="num">${man(v)}</td>`).join("")}<td class="num">${man(tx)}</td><td class="num">${man(tg)}</td></tr></tfoot>`;
+  document.getElementById("m-target").innerHTML = h;
+  document.getElementById("m-ss").textContent = `${b.name} は、去年の時点で発売3か月以内だった品番が ${b.fac.ssNew.toFixed(2)} 倍、それより前からの品番が ${b.fac.ssOld.toFixed(2)} 倍です。`;
+  document.getElementById("m-coh").textContent = `${b.name} は 1月 ${b.fac.coh[0].toFixed(2)} 倍・4月 ${b.fac.coh[3].toFixed(2)} 倍・7月 ${b.fac.coh[M-1].toFixed(2)} 倍です（10月を1として）。`;
+  document.getElementById("m-stella").textContent = b.key === "stella" ? "STELLA FISH は去年の実績が少ないので、②の季節の伸びと残り方の比は、Futier Land と ABYS を合わせて測った値を使っています。" : "";
+  const pr = b.profiles["春夏"], E = [0,1,2,3,4].map(k => TIERS.reduce((a,t) => a + (pr.p[t] || 0) * (pr.prof[t][k] || 0), 0));
+  document.getElementById("m-e").textContent = `${b.name} で春夏に1型出すと、平均で 発売月 ${(E[0]/1e4).toFixed(1)}万・1か月目 ${(E[1]/1e4).toFixed(1)}万・2か月目 ${(E[2]/1e4).toFixed(1)}万・3か月目 ${(E[3]/1e4).toFixed(1)}万・4か月目 ${(E[4]/1e4).toFixed(1)}万円（当たり×1.0）`;
+  const A = b.aw, P = v => v == null ? "–" : Math.round(v * 100) + "%", Y = v => v == null ? "–" : (v/1e4).toFixed(1) + "万";
+  document.getElementById("m-awrange").textContent = `去年・今年とも ${DATA.aw.range}`;
+  document.getElementById("m-awdays").textContent = DATA.aw.days;
+  document.getElementById("m-aw").innerHTML = `<thead><tr><th>${b.name}</th><th>型数</th><th>1型の平均</th><th>真ん中の型</th><th>30日で30万円以上</th><th>30日で10万円以上</th></tr></thead><tbody>` +
+    [["去年のAW", A["2025"]], ["今年のAW", A["2026"]]].map(([l, r]) => `<tr><td>${l}</td><td class="num">${r.n}</td><td class="num">${Y(r.avg)}</td><td class="num">${Y(r.med)}</td><td class="num">${P(r.hi)}</td><td class="num">${P(r.mid)}</td></tr>`).join("") + "</tbody>";
+  document.getElementById("m-awnote").textContent = A.mult != null ? `${b.name} の「今年のAW並み」は ×${A.mult.toFixed(1)} です（10万円以上の割合 ${P(A["2025"].mid)} → ${P(A["2026"].mid)}）。` : A.note + "このブランドの「今年のAW並み」のボタンは押せません。";
+  { const tz = b.target.reduce((a,v)=>a+v,0), tt = b.total.reduce((a,v)=>a+v,0);
+    document.getElementById("m-share").textContent = `${b.name} の1〜7月は 全モール ${yen(tt)}、うち ZOZO ${yen(tz)}（${Math.round(tz/tt*100)}%）。全モールの内訳：` + Object.entries(b.malls).sort((x,y)=>y[1]-x[1]).map(([k,v]) => `${k} ${yen(v)}`).join("・") + "。"; }
+  document.getElementById("m-asof").textContent = "使ったデータ：" + DATA.asof + "。新作の当たり方は2025年6月〜2026年7月に出た新作。";
+}
+function renderScope(){
+  const b = DATA.brands[state.b];
+  document.querySelectorAll("[data-scope]").forEach(x => x.setAttribute("aria-pressed", x.dataset.scope === state.scope));
+  const tz = b.target.reduce((a,v)=>a+v,0), tt = b.total.reduce((a,v)=>a+v,0);
+  document.getElementById("scopenote").textContent = ALL()
+    ? `全モールの予算で見ています（${b.name} の1〜7月 ${yen(tt)}、うち ZOZO ${yen(tz)}＝${Math.round(tz/tt*100)}%）。売上は ZOZO の見込みを ZOZO の割合で割って全体にしています。`
+    : `ZOZO の予算と ZOZO の売上（本店＋Yahoo 店）で見ています（${b.name} の1〜7月 ${yen(tz)}）。`;
+}
+function renderMake(){
+  const b = DATA.brands[state.b], n = state.n[state.b], mult = state.mult[state.b];
+  const rows = [], T = {cnt:0, init:0, add:0, cost:0, price:0, sold:0};
+  LAUNCH.forEach((lm, li) => {
+    const cnt = +n[lm] || 0, se = li === 0 ? "秋冬" : "春夏", A = b.arr[se], p = probs(b.profiles[se], mult);
+    const r = {lm, cnt, init:0, add:0, cost:0, price:0, sold:0};
+    TIERS.forEach(t => { const q = cnt * p[t], a = A[t], u = a.init + a.add;
+      r.init += q * a.init; r.add += q * a.add; r.cost += q * u * (a.cost || 0); r.price += q * u * (a.price || 0); r.sold += q * a.sold; });
+    rows.push(r); Object.keys(T).forEach(k => T[k] += k === "cnt" ? cnt : r[k]);
+  });
+  const N = v => Math.round(v).toLocaleString("ja-JP"), P = (s, u) => u > 0 ? Math.round(s / u * 100) + "%" : "–";
+  const tr = r => `<td class="num">${N(r.init)}</td><td class="num">${N(r.add)}</td><td class="num">${N(r.init + r.add)}</td><td class="num">${man(r.cost)}</td><td class="num">${man(r.price)}</td><td class="num">${N(r.sold)}</td><td class="num">${P(r.sold, r.init + r.add)}</td>`;
+  document.getElementById("maketable").innerHTML = `<thead><tr><th>投入月</th><th>型数</th><th>初回の枚数</th><th>追加の枚数</th><th>入荷 計（枚）</th><th>仕入れ金額（下代・万円）</th><th>上代の金額（万円）</th><th>9か月で売れる枚数</th><th>売れる割合</th></tr></thead><tbody>` +
+    rows.map(r => `<tr><td><span class="sw" style="display:inline-block;background:var(${SERIES[LAUNCH.indexOf(r.lm)]});margin-right:6px;vertical-align:-1px"></span>${r.lm}月に出す</td><td class="num">${r.cnt}</td>${tr(r)}</tr>`).join("") +
+    `</tbody><tfoot><tr><td>計</td><td class="num">${T.cnt}</td>${tr(T)}</tr></tfoot>`;
+  document.getElementById("makenote").textContent = T.cnt ? `この型数だと、まず初回で ${N(T.init)}枚（1型平均 ${N(T.init / T.cnt)}枚）を仕込み、当たった型の追加で ${N(T.add)}枚が加わる見込みです。仕入れ金額は計 ${yen(T.cost)}（うち初回 約${yen(rows.reduce((a,r)=>a + r.init / Math.max(1, r.init + r.add) * r.cost, 0))}）。` : "型数を入れると出ます。";
+  const sh = se => b.arr[se]._src === se ? se : `${se}（数が少ないので通年）`;
+  let h = `<thead><tr><th>季節・区分</th><th>去年の型数</th><th>初回（枚）</th><th>追加（枚）</th><th>下代</th><th>上代</th><th>9か月で売れた（枚）</th><th>売れた割合</th></tr></thead><tbody>`;
+  ["秋冬", "春夏"].forEach(se => TIERS.forEach(t => { const a = b.arr[se][t];
+    h += `<tr><td>${sh(se)} ${t}</td><td class="num">${a.n}</td><td class="num">${N(a.init)}</td><td class="num">${N(a.add)}</td><td class="num">¥${N(a.cost || 0)}</td><td class="num">¥${N(a.price || 0)}</td><td class="num">${N(a.sold)}</td><td class="num">${P(a.sold, a.init + a.add)}</td></tr>`; }));
+  document.getElementById("makebase").innerHTML = h + "</tbody>";
+}
+function renderAll(){ renderTabs(); renderScope(); renderRows(); renderItems(); renderCalc(); renderMethod(); }
+
+document.querySelectorAll("[data-preset]").forEach(bt => bt.addEventListener("click", () => { const b = DATA.brands[state.b]; state.n[state.b] = bt.dataset.preset === "fill" ? fillFor(state.b) : {...b.presets[bt.dataset.preset]}; remember(); renderRows(); renderCalc(); }));
+// 「不足を型数で埋める」：「去年と同じ」の型数を同じ倍率で増やし、今のつまみの当たりで1〜7月の新作の売上が新作で必要な金額に届く、いちばん小さい倍率
+function fillFor(bi){ const base = DATA.brands[bi].presets.lastyear, keep = state.n[bi]; let lo = 0, hi = 80;
+  const mk = f => { const o = {}; LAUNCH.forEach(lm => o[lm] = Math.ceil((base[lm] || 0) * f)); return o; };
+  for (let i = 0; i < 40; i++) { const mid = (lo + hi) / 2; state.n[bi] = mk(mid); const c = compute(bi); if (c.newAll >= c.gapAll) hi = mid; else lo = mid; }
+  state.n[bi] = keep; return mk(hi); }
+document.getElementById("mult").addEventListener("input", e => { state.mult[state.b] = +e.target.value; remember(); renderCalc(); });
+document.querySelectorAll("[data-scope]").forEach(x => x.addEventListener("click", () => { state.scope = x.dataset.scope; remember(); renderAll(); }));
+const setMult = v => { state.mult[state.b] = v; document.getElementById("mult").value = v; remember(); renderCalc(); };
+document.getElementById("m-ly").addEventListener("click", () => setMult(1));
+document.getElementById("m-awbtn").addEventListener("click", () => { const a = DATA.brands[state.b].aw.mult; if (a != null) setMult(a); });
+
+let DB; // undefined=準備中, null=使えない
+document.getElementById("savebtn").addEventListener("click", async () => {
+  if (!DB) return; const b = DATA.brands[state.b], c = compute(state.b), st = document.getElementById("savest");
+  const body = {brand: b.name, types: {...state.n[state.b]}, mult: state.mult[state.b], savedAt: new Date().toISOString(),
+    newSales: Math.round(c.newAll), coverageFY: +c.fy.toFixed(3), coverageAll: +c.all.toFixed(3),
+    tate: +c.tierN["縦売り"].toFixed(1), chuken: +c.tierN["中堅"].toFixed(1)};
+  st.textContent = "保存しています…";
+  try { await DB.doc("plans/" + b.key).set(body); }
+  catch(e) { st.textContent = e && e.code === "invalid_argument" ? "保存する権限がありません（閲覧のみの共有）。" : "保存できませんでした。少し待ってからもう一度押してください。"; }
+});
+document.getElementById("loadbtn").addEventListener("click", () => { const b = DATA.brands[state.b], sv = state.saved[b.key]; if (!sv) return;
+  state.n[state.b] = {...state.n[state.b], ...sv.types}; state.mult[state.b] = +sv.mult || 1; remember(); renderRows(); renderCalc(); });
+
+renderAll();
+(async () => {
+  try { DB = window.claude && window.claude.use ? await window.claude.use("db") : null; } catch(e) { DB = null; }
+  if (!DB) { renderSave(); return; }
+  DATA.brands.forEach(b => {
+    try { DB.doc("plans/" + b.key).onSnapshot(s => { state.saved[b.key] = s.exists ? s.data() : null; renderSave(); }, () => {}); } catch(e) {}
+  });
+  renderSave();
+})();
+</script>
+
+</body>
+</html>

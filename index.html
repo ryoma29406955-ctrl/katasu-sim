@@ -9,11 +9,11 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Zen+Kaku+Gothic+New:wght@400;500;700&family=IBM+Plex+Mono:wght@500&display=swap">
 <style>
-/* 型数の計画表：左に投入月ごとの型数（操作）、右に「いつ売上になるか」の積み上げ。下に投入月×売上月の表 */
+/* 型数の計画表 v2：アイテム × 投入月の型数（入力）→ 1型の売れ方（強さ × 季節の波 × 発売からの経過）を1,000回引いて、月ごとの売上・ぶれの幅・届く確率 */
 :root{
   --bg:#f6f6f3; --panel:#ffffff; --ink:#1d2126; --ink-2:#4a5058; --ink-3:#7d838b; --line:#e2e2dc; --line-2:#cfd0c9;
   --accent:#23405c; --accent-ink:#ffffff; --good:#1f7a4d; --warn:#a15c00; --bad:#b3362f;
-  --exist:#b9bdb8; --target:#1d2126;
+  --exist:#b9bdb8; --target:#1d2126; --band:#1d2126; --cal:#eef3f8;
   --s0:#2a78d6; --s1:#eb6834; --s2:#1baf7a; --s3:#eda100; --s4:#e87ba4; --s5:#008300;
   --font:"Zen Kaku Gothic New","Hiragino Kaku Gothic ProN","Yu Gothic UI","Meiryo",system-ui,sans-serif;
   --mono:"IBM Plex Mono",ui-monospace,"SFMono-Regular",Consolas,monospace;
@@ -21,22 +21,22 @@
 @media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
   --bg:#141619; --panel:#1c1f23; --ink:#eceee9; --ink-2:#c3c6c0; --ink-3:#8d929a; --line:#2c3036; --line-2:#3a3f46;
   --accent:#9cc3e8; --accent-ink:#101418; --good:#4fbf86; --warn:#e0a03a; --bad:#ec6d64;
-  --exist:#5a5f63; --target:#eceee9;
+  --exist:#5a5f63; --target:#eceee9; --band:#eceee9; --cal:#1f2a35;
   --s0:#3987e5; --s1:#d95926; --s2:#199e70; --s3:#c98500; --s4:#d55181; --s5:#008300; color-scheme:dark}}
 :root[data-theme="dark"]{
   --bg:#141619; --panel:#1c1f23; --ink:#eceee9; --ink-2:#c3c6c0; --ink-3:#8d929a; --line:#2c3036; --line-2:#3a3f46;
   --accent:#9cc3e8; --accent-ink:#101418; --good:#4fbf86; --warn:#e0a03a; --bad:#ec6d64;
-  --exist:#5a5f63; --target:#eceee9;
+  --exist:#5a5f63; --target:#eceee9; --band:#eceee9; --cal:#1f2a35;
   --s0:#3987e5; --s1:#d95926; --s2:#199e70; --s3:#c98500; --s4:#d55181; --s5:#008300; color-scheme:dark}
 body{background:var(--bg);color:var(--ink);font-family:var(--font);font-size:14px;line-height:1.6}
 .wrap{max-width:1180px;margin:0 auto;padding-block:20px 48px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));display:flex;flex-direction:column;gap:18px}
 h1{font-size:24px;font-weight:700;margin:0;letter-spacing:.02em;text-wrap:balance}
-.sub{color:var(--ink-2);margin:4px 0 0;max-width:70ch}
+.sub{color:var(--ink-2);margin:4px 0 0;max-width:78ch}
 .num{font-family:var(--mono);font-variant-numeric:tabular-nums}
 .tabs{display:flex;gap:6px;flex-wrap:wrap}
 .tab{border:1px solid var(--line-2);background:var(--panel);color:var(--ink);padding:7px 16px;border-radius:999px;font:inherit;font-weight:500;cursor:pointer}
 .tab[aria-selected="true"]{background:var(--accent);color:var(--accent-ink);border-color:var(--accent)}
-.tab:focus-visible,.btn:focus-visible,.step:focus-visible,input:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.tab:focus-visible,.btn:focus-visible,input:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
 .kpis{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px}
 .kpi{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:12px 14px;min-width:0}
 .kpi .k{font-size:12px;color:var(--ink-3);letter-spacing:.04em}
@@ -44,75 +44,66 @@ h1{font-size:24px;font-weight:700;margin:0;letter-spacing:.02em;text-wrap:balanc
 .kpi .s{font-size:12px;color:var(--ink-2)}
 .pill{display:inline-block;font-size:11px;padding:1px 8px;border-radius:999px;margin-left:6px;vertical-align:3px;border:1px solid currentColor}
 .ok{color:var(--good)} .mid{color:var(--warn)} .ng{color:var(--bad)}
-.main{display:grid;grid-template-columns:340px minmax(0,1fr);gap:14px;align-items:start}
 .card{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:14px;min-width:0}
 .card h2{font-size:15px;margin:0 0 10px;font-weight:700}
-.rows{display:flex;flex-direction:column;gap:8px}
-.lrow{display:grid;grid-template-columns:14px 72px 1fr;gap:8px;align-items:center}
-.sw{width:12px;height:12px;border-radius:3px}
-.lrow .lab{font-weight:500;white-space:nowrap}
-.stepper{display:flex;align-items:center;gap:4px;justify-content:flex-end}
-.step{min-width:30px;height:30px;padding:0 5px;white-space:nowrap;border:1px solid var(--line-2);background:var(--bg);color:var(--ink);border-radius:6px;font:inherit;font-size:12.5px;cursor:pointer;line-height:1}
-.stepper input{width:54px;height:30px;text-align:right;border:1px solid var(--line-2);background:var(--panel);color:var(--ink);border-radius:6px;font-family:var(--mono);font-size:14px;padding:0 6px}
-.lhint{grid-column:2 / 4;font-size:11.5px;color:var(--ink-3);margin-top:-4px}
-.total{display:flex;justify-content:space-between;border-top:1px solid var(--line);padding-top:8px;margin-top:2px;font-weight:700}
-.presets{display:flex;flex-wrap:wrap;gap:6px;margin-top:10px}
+.ctl{display:grid;grid-template-columns:minmax(0,1fr) 300px;gap:18px;align-items:start}
 .btn{border:1px solid var(--line-2);background:var(--bg);color:var(--ink);border-radius:6px;padding:6px 10px;font:inherit;font-size:12.5px;cursor:pointer}
 .btn.primary{background:var(--accent);color:var(--accent-ink);border-color:var(--accent);font-weight:700;padding:8px 14px;font-size:13.5px}
 .btn:disabled{opacity:.45;cursor:not-allowed}
-.slider{margin-top:14px;border-top:1px solid var(--line);padding-top:12px}
+.presets{display:flex;flex-wrap:wrap;gap:6px;margin-top:10px}
+.side{display:flex;flex-direction:column;gap:14px}
 .slider label{display:flex;justify-content:space-between;font-weight:500}
 .slider input{width:100%;accent-color:var(--accent)}
-.slider .hint{font-size:12px;color:var(--ink-2)}
+.hint{font-size:12px;color:var(--ink-2)}
 .mbtns{display:flex;flex-wrap:wrap;gap:6px;margin:8px 0 4px}
-.scope{display:flex;flex-wrap:wrap;align-items:center;gap:6px 8px;margin:-4px 0 14px}
+.mbtns .btn[aria-pressed="true"]{border-color:var(--accent);font-weight:700}
+.scope{display:flex;flex-wrap:wrap;align-items:center;gap:6px 8px;margin:-4px 0 0}
 .scope .lab{font-size:12.5px;color:var(--ink-2);font-weight:500;margin-right:2px}
 .scope .btn[aria-pressed="true"]{background:var(--ink);color:var(--panel);border-color:var(--ink)}
 .scope .note{flex-basis:100%;margin:0}
-.mbtns .btn[aria-pressed="true"]{border-color:var(--accent);color:var(--ink);font-weight:700}
-.mbtns .btn:disabled{opacity:.5;cursor:default}
-.save{margin-top:14px;border-top:1px solid var(--line);padding-top:12px;display:flex;flex-direction:column;gap:6px}
+.save{border-top:1px solid var(--line);padding-top:12px;display:flex;flex-direction:column;gap:6px}
 .save .st{font-size:12px;color:var(--ink-2)}
+.tblwrap{overflow-x:auto}
+table.in{border-collapse:collapse;width:100%;min-width:640px;font-size:12.5px}
+table.in th,table.in td{border-bottom:1px solid var(--line);padding:3px 4px;text-align:center;white-space:nowrap}
+table.in th:first-child,table.in td:first-child{text-align:left;padding-right:8px}
+table.in thead th{color:var(--ink-3);font-weight:500;font-size:12px}
+table.in td.cal{background:var(--cal)}
+table.in th:first-child,table.in td:first-child{position:sticky;left:0;background:var(--panel);z-index:1}
+table.in input{width:46px;height:28px;text-align:right;border:1px solid var(--line-2);background:var(--panel);color:var(--ink);border-radius:5px;font-family:var(--mono);font-size:13px;padding:0 5px}
+table.in input.z{color:var(--ink-3)}
+table.in tfoot td{font-weight:700}
+.tag{display:inline-block;font-size:10.5px;padding:0 6px;border-radius:999px;border:1px solid var(--line-2);color:var(--ink-2);margin-left:6px}
 .chartwrap{position:relative}
 svg{display:block;width:100%;height:auto}
 .legend{display:flex;flex-wrap:wrap;gap:6px 14px;font-size:12px;color:var(--ink-2);margin-top:6px}
 .legend button{display:inline-flex;align-items:center;gap:5px;background:none;border:0;color:inherit;font:inherit;cursor:pointer;padding:2px 0}
 .legend button[aria-pressed="true"]{color:var(--ink);font-weight:700;text-decoration:underline;text-underline-offset:3px}
-.tip{position:absolute;pointer-events:none;background:var(--panel);border:1px solid var(--line-2);border-radius:8px;padding:8px 10px;font-size:12px;box-shadow:0 4px 18px rgba(0,0,0,.12);min-width:180px;z-index:5}
+.sw{display:inline-block;width:12px;height:12px;border-radius:3px;vertical-align:-1px}
+.tip{position:absolute;pointer-events:none;background:var(--panel);border:1px solid var(--line-2);border-radius:8px;padding:8px 10px;font-size:12px;box-shadow:0 4px 18px rgba(0,0,0,.12);min-width:190px;z-index:5}
 .tip table{border-collapse:collapse;width:100%}
 .tip td{padding:1px 0}
 .tip td.r{text-align:right;font-family:var(--mono);padding-left:12px}
-.tblwrap{overflow-x:auto}
-table.co{border-collapse:collapse;width:100%;min-width:760px;font-size:12.5px}
+table.co{border-collapse:collapse;width:100%;min-width:720px;font-size:12.5px}
 table.co th,table.co td{border-bottom:1px solid var(--line);padding:6px 8px;text-align:right;white-space:nowrap}
 table.co th:first-child,table.co td:first-child{text-align:left}
 table.co thead th{color:var(--ink-3);font-weight:500;font-size:12px}
-table.co tbody tr{cursor:pointer}
-table.co tbody tr.sel td{outline:1px solid var(--accent);outline-offset:-1px}
 table.co tfoot td{font-weight:700}
-table.co td.fy{border-left:2px dashed var(--line-2)}
-.cell{border-radius:4px}
-.items{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:10px}
-.itm{border:1px solid var(--line);border-radius:8px;padding:10px;min-width:0}
-.itm h3{font-size:13px;margin:0 0 6px;display:flex;align-items:center;gap:6px}
-.chips{display:flex;flex-wrap:wrap;gap:4px}
-.chip .span{display:inline-block;white-space:nowrap;margin-left:5px;padding:0 5px;border-radius:999px;background:var(--line);color:var(--ink-2);font-size:10.5px}
-.items .chip{border-radius:10px}
-.chip{font-size:11.5px;background:var(--bg);border:1px solid var(--line);border-radius:999px;padding:1px 8px;color:var(--ink-2)}
+table.co td.fy,table.co th.fy{border-left:2px dashed var(--line-2)}
+table.co tr.band td{color:var(--ink-3);font-weight:500}
+.cell{border-radius:4px;padding:1px 6px}
 .note{font-size:12.5px;color:var(--ink-2)}
 details summary{cursor:pointer;font-weight:500}
 #method h3{font-size:14px;margin:18px 0 6px;font-weight:700}
 #method h3:first-of-type{margin-top:8px}
-#method p,#method li{font-size:13px;color:var(--ink-2);max-width:86ch}
+#method p,#method li{font-size:13px;color:var(--ink-2);max-width:88ch}
 #method p{margin:0 0 6px}
 #method ul{margin:4px 0 6px;padding-left:20px}
 #method li{margin:0 0 4px}
 #method b{color:var(--ink);font-weight:700}
 #method .eq{display:inline-block;background:var(--bg);border:1px solid var(--line);border-radius:6px;padding:2px 8px;margin:2px 0;color:var(--ink);font-size:13px}
-#method table.co{min-width:720px}
-#method table.co tbody tr{cursor:default}
-details ul{margin:8px 0 0;padding-left:18px}
-@media (max-width:860px){.main{grid-template-columns:minmax(0,1fr)} .kpis{grid-template-columns:repeat(2,minmax(0,1fr))}}
+#method table.co{min-width:680px}
+@media (max-width:900px){.ctl{grid-template-columns:minmax(0,1fr)} .kpis{grid-template-columns:repeat(2,minmax(0,1fr))}}
 @media (prefers-reduced-motion:no-preference){.bar{transition:opacity .15s}}
 </style>
 <style>.save{display:none}</style>
@@ -123,7 +114,7 @@ details ul{margin:8px 0 0;padding-left:18px}
 <div class="wrap">
   <header>
     <h1>新作の型数シミュレーター</h1>
-    <p class="sub">投入月ごとの型数を変えると、その型が何月にいくら売上になるか、目標にどこまで届くかが出ます。税抜。目標は「ブランド別売上予算_202601-202707」の予算（1〜7月）で、「ZOZO だけ」と「全モール」を切り替えられます。下の「作る量」に、この型数で仕込む枚数と仕入れ金額が出ます。当たりは「去年並み」と「今年のAW並み」を切り替えられます。数字の出し方は<a href="#method">ページの下</a>にまとめています。</p>
+    <p class="sub">アイテムごと・投入月ごとに型数を入れると、1〜7月のどの月にいくら売れそうか、目標にどこまで届くか、届く確率がどれくらいかが出ます。税抜。新作の売れ方は「強さ × 季節の波 × 発売からの経過」で、当たり外れを1,000回くり返し引いて、平均とぶれの幅を出しています。数字の出し方は<a href="#method">ページの下</a>にあります。</p>
   </header>
 
   <div class="tabs" role="tablist" id="tabs"></div>
@@ -131,250 +122,255 @@ details ul{margin:8px 0 0;padding-left:18px}
 
   <section class="kpis" id="kpis" aria-live="polite"></section>
 
-  <section class="main">
-    <div class="card">
-      <h2>投入する型数</h2>
-      <div class="rows" id="rows"></div>
-      <div class="total"><span>12〜5月の計</span><span class="num" id="ntotal"></span></div>
-      <div class="presets">
-        <button class="btn" type="button" data-preset="lastyear">去年と同じ（カレンダーどおり）</button>
-        <button class="btn" type="button" data-preset="guide">目安（月40型の配分）</button>
-        <button class="btn" type="button" data-preset="fill">不足を型数で埋める</button>
+  <section class="card">
+    <h2>投入する型数（アイテム × 投入月）</h2>
+    <div class="ctl">
+      <div>
+        <div class="tblwrap"><table class="in" id="intable"></table></div>
+        <p class="note">青い地のマスは、時期別投入カレンダーでそのアイテムを出す月です。タグは売れる季節の型（ZOZO 全体の波の山の位置）です。</p>
+        <div class="presets">
+          <button class="btn" type="button" data-preset="actual">去年の実際の出し方</button>
+          <button class="btn" type="button" data-preset="calendar">去年と同じ型数をカレンダーの月に</button>
+          <button class="btn" type="button" data-preset="guide">目安（Futier 100・ABYS 50・STELLA 50型）</button>
+          <button class="btn" type="button" data-preset="fillmean">平均で届く型数</button>
+          <button class="btn" type="button" data-preset="fill80">8割の確率で届く型数</button>
+          <button class="btn" type="button" data-preset="clear">全部0</button>
+        </div>
+        <p class="note" id="presetnote"></p>
       </div>
-      <div class="slider">
-        <label for="mult"><span>当たり（縦売り・中堅の割合）</span><span class="num" id="multv"></span></label>
-        <input type="range" id="mult" min="0.3" max="3" step="0.1" value="1">
-        <div class="mbtns"><button class="btn" type="button" id="m-ly">去年並み（×1.0）</button><button class="btn" type="button" id="m-awbtn">今年のAW並み</button></div>
-        <div class="hint" id="multhint"></div>
-      </div>
-      <div class="save">
-        <button class="btn primary" type="button" id="savebtn">この型数で決める</button>
-        <div class="st" id="savest">保存の準備をしています…</div>
-        <button class="btn" type="button" id="loadbtn" hidden>保存した型数に戻す</button>
-      </div>
+      <div class="side">
+        <div class="slider">
+          <label for="level"><span>新作1型の強さ（去年の春夏＝1）</span><span class="num" id="levelv"></span></label>
+          <input type="range" id="level" min="0.2" max="1.5" step="0.05" value="1">
+          <div class="mbtns"><button class="btn" type="button" data-level="ly">去年並み（×1.0）</button><button class="btn" type="button" data-level="aw">今年のAW並み</button><button class="btn" type="button" data-level="trend">これまでの下がり方（×0.5）</button></div>
+          <div class="hint" id="levelhint"></div>
+        </div>
+        <div class="save">
+          <button class="btn primary" type="button" id="savebtn">この型数で決める</button>
+          <div class="st" id="savest">保存の準備をしています…</div>
+          <button class="btn" type="button" id="loadbtn" hidden>保存した型数に戻す</button>
+        </div>
 <p class="note" style="margin-top:14px">このページでは型数の保存はできません。動かした型数は、この端末のブラウザに残ります。</p>
-    </div>
-
-    <div class="card">
-      <h2>いつ売上になるか（月ごと）</h2>
-      <div class="chartwrap" id="chartwrap">
-        <svg id="chart" viewBox="0 0 760 380" role="img" aria-label="月ごとの売上の内訳と目標"></svg>
-        <div class="tip" id="tip" hidden></div>
       </div>
-      <div class="legend" id="legend"></div>
-      <p class="note">投入月の色を押すと、その月に出した型の売上だけが目立ちます。黒い横線が目標です。</p>
     </div>
   </section>
 
   <section class="card">
-    <h2>投入月ごとの売上の出方（万円）</h2>
+    <h2>いつ売上になるか（月ごと・平均）</h2>
+    <div class="chartwrap" id="chartwrap">
+      <svg id="chart" viewBox="0 0 760 390" role="img" aria-label="月ごとの売上の内訳と目標"></svg>
+      <div class="tip" id="tip" hidden></div>
+    </div>
+    <div class="legend" id="legend"></div>
+    <p class="note">棒は1,000回の平均です。細い縦線は、当たり外れによるぶれの幅（下から10%〜90%）。投入月の色を押すと、その月に出した型の売上だけが目立ちます。黒い横線が目標です。</p>
+  </section>
+
+  <section class="card">
+    <h2>投入月ごとの売上の出方（平均・万円）</h2>
     <div class="tblwrap"><table class="co" id="cotable"></table></div>
-    <p class="note">行を押すと、上のグラフでその投入月が目立ちます。破線より右は来期（5〜7月）。</p>
+    <p class="note">破線より右は来期（5〜7月）。下の2行は、既存品＋新作の合計のぶれの幅です。</p>
+  </section>
+
+  <section class="card">
+    <h2>アイテムごとの売上（平均・万円）</h2>
+    <div class="tblwrap"><table class="co" id="gtable"></table></div>
+  </section>
+
+  <section class="card">
+    <h2>1型出したときの売上（アイテム × 投入月・平均・万円）</h2>
+    <p class="note" id="pertypenote"></p>
+    <div class="tblwrap"><table class="co" id="pertype"></table></div>
   </section>
 
   <section class="card" id="make">
-    <h2>作る量（この型数で・全チャネル）</h2>
-    <p class="note">去年の新作が実際に何枚入荷したかを、縦売り・中堅・その他ごとに平均し、今の型数と当たりに掛けたものです。在庫は全チャネル共通なので、全チャネルの枚数です。</p>
+    <h2>作る量の目安（この型数で・全チャネル）</h2>
     <div class="tblwrap"><table class="co" id="maketable"></table></div>
     <p class="note" id="makenote"></p>
-    <details>
-      <summary>去年の新作の入荷（1型あたりの平均）</summary>
-      <div class="tblwrap"><table class="co" id="makebase"></table></div>
-      <ul class="note">
-        <li>入荷は、売上推移表の週ごとの「今週の総在庫 − 先週の総在庫 ＋ 先週の売れ」です（取り置きは戻してあります）。</li>
-        <li>初回＝最初に入荷した週から4週以内の入荷。追加＝それより後、発売から9か月以内の入荷です。追加はほとんど当たった型で起きます。</li>
-        <li>下代は原価から出しています（原価150以下は元：元×26×1.1＋450、それより上は円：円＋450）。上代は売上推移表の売価です。</li>
-        <li>売れ残りは「入荷 − 発売から9か月で売れた枚数」です。発売が遅い型は9か月分見えていないので、売れた枚数は少なめに出ます。</li>
-      </ul>
-    </details>
-  </section>
-
-  <section class="card">
-    <h2>カレンダーで、その月に出すアイテム（括弧は去年の春夏の型数）</h2>
-    <p class="note">投入の時期は、時期別投入カレンダーの「月別アイテム一覧 SS」の予約開始です（そこに無いアイテムは「元データ１」の仕込み開始）。灰色の印がその時期です。2か月以上にまたがるアイテムは、またがる月すべてに出し、ひな形の型数はまたがる月に均等に分けています。</p>
-    <div class="items" id="items"></div>
-  </section>
-
-  <section class="card">
-    <h2>当たり方の前提</h2>
-    <div class="tblwrap"><table class="co" id="tiertable"></table></div>
-    <p class="note" id="hits"></p>
   </section>
 
   <section class="card" id="method">
-    <h2>数字の出し方（予算の組み方）</h2>
-    <p>このページの数字は、次の8つの段階で出しています。表と例は、上で選んでいるブランド（<b id="m-brand"></b>）の値です。</p>
+    <h2>数字の出し方</h2>
+    <p>表と例は、上で選んでいるブランド（<b id="m-brand"></b>）の値です。</p>
 
     <h3>① 目標 ＝ ZOZO の月の予算 × ブランドの配分</h3>
-    <p>「ブランド別売上予算_202601-202707」の ZOZO の行（月ごとの予算）に、同じファイルの ZOZO のブランド配分（Futier Land 75%・ABYS 20%・STELLA FISH 5%）を掛けています。</p>
-    <p><span class="eq" id="m-eq"></span></p>
-    <p>同じファイルの楽天・SHOPLIST・YAHOO などほかのモールの行は入れていません。売上は ZOZO の売上集計（本店＋Yahoo 店・税抜）で比べています。</p>
+    <p>「ブランド別売上予算_202601-202707」の ZOZO の行に、同じファイルの ZOZO のブランド配分（Futier Land 75%・ABYS 20%・STELLA FISH 5%）を掛けています。<span class="eq" id="m-eq"></span></p>
     <div class="tblwrap"><table class="co" id="m-target"></table></div>
 
-    <h3>② 既存品で作れる金額（グラフのグレーの部分）</h3>
-    <p>今の売上推移表（代表シート）に載っている、今も扱っている品番だけを、1品番ずつ見込んで足しています。品番は次の3つに分けています。</p>
+    <h3>② 既存品で作れる金額（グラフのグレー）</h3>
     <ul>
-      <li><b>去年からの品番・今年の春夏に出した品番の1月</b>：2026年10月の売上 × 季節の伸び。季節の伸びは、その品番自身の去年の「2026年1月 ÷ 2025年10月」です（去年10月に5万円以上売れていた品番だけ。0.2〜2倍に収める）。それ以外の品番は、同じ子カテゴリの品番の去年の比を使います。</li>
-      <li><b>同じ品番の2〜7月</b>：去年の同じ月に売れていた品番は「去年の同じ月の売上 × 2年目の残り方」です。2年目の残り方は、去年からある品番の売上が 2025年5〜7月 → 2026年5〜7月 でどれだけ残ったかの比です。<span id="m-ss"></span>去年の同じ月に売れていない今年の春夏の品番（2026年2〜7月発売）は「2026年5〜7月の月平均 × 季節の比 × 2年目の残り方」です。</li>
-      <li><b>今季すでに出した新作（2026年8月以降の発売）</b>：2026年10月の売上 × 去年の同じ時期（2025年8〜10月）に出した新作が、10月からその月までにどう推移したかの比です。<span id="m-coh"></span>11月に出た新作は10月の売上が無いので、0で数えています（控えめの見込み）。</li>
-    </ul>
-    <p id="m-stella"></p>
-
-    <h3>③ 新作で必要な金額 ＝ 目標 − 既存品</h3>
-    <p>月ごとに引き算しています（既存品が目標を超える月は0）。上の表の「新作で必要」の合計が、上の数字の「新作で必要」です。</p>
-
-    <h3>④ 新作の当たり方（去年の実績）</h3>
-    <p>2025年6月〜2026年7月に ZOZO で初めて売れた品番を「去年の新作」として、初めて売れた日から90日の売上で3つに分けました。</p>
-    <ul>
-      <li><b>縦売り</b>：90日で100万円以上　<b>中堅</b>：30万〜100万円　<b>その他</b>：30万円未満</li>
-      <li>初めて売れた月が8〜1月なら秋冬、2〜7月なら春夏の当たり方です。</li>
-      <li>区分ごとに「何型に1型その区分になったか（割合）」を出しています。割合は上の「当たり方の前提」の表です。いつ・どれだけ売れるかは次の⑤です。</li>
+      <li><b>去年からの品番・今年の春夏の品番の1月</b>：2026年10月の売上 × その品番の去年の「2026年1月 ÷ 2025年10月」（0.2〜2倍に収める。足りない品番は同じ子カテゴリの比）。</li>
+      <li><b>同じ品番の2〜7月</b>：去年の同じ月の売上 × 2年目の残り方。<span id="m-ss"></span></li>
+      <li><b>今季すでに出した新作（2026年8月以降の発売）</b>：2026年10月の売上 × 去年の同じ時期に出した新作の推移。<span id="m-coh"></span></li>
     </ul>
 
-    <h3>⑤ 新作の売上 ＝ 型数 × 区分の割合 × 1型の月の売上（季節 × 発売からの経過）</h3>
-    <p>1型の月の売上は「強さ × その月の季節の波 × 発売からの経過」で出しています。去年は春夏物を4〜5月に出していましたが、今年は早めに出すので、「発売から何か月目か」だけで決めると、2月に出した半袖が3月から売れる計算になってしまいます。そこで、いつ売れるかは季節で決めています。</p>
+    <h3>③ 新作1型の売れ方 ＝ 強さ × 季節の波 × 発売からの経過（週ごと）</h3>
+    <p>売上推移表（全チャネル・週ごと・2024年1月〜）にある新作 1,347型（2024年3月以降に初めて売れた服と靴）の、週ごとの売れ枚数から測りました。</p>
     <ul>
-      <li><b>季節の波</b>：ZOZO 全体の波動データ（ZOZOTOWN のカテゴリごとの週の売上の構成比。年の平均＝1）を月にしたものです。投入月ごとに、カレンダーでその月に出すアイテムの型数の配分で混ぜています（5月に出す型はカレンダー外なので、そのブランドのカレンダーの夏物の配分）。<span id="m-wave"></span></li>
-      <li><b>発売からの経過</b>：発売した月は月の途中からなので少なめ、1〜3か月目は同じ、4か月目からは下がります。去年の新作で測った係数で、発売の時期で3つに分けています。<span id="m-age"></span></li>
-      <li><b>強さ</b>：去年の新作（2025年12月〜2026年7月に初めて売れた服 219型）の売上を「季節の波 × 経過」で割って、ブランド × 区分ごとに出しました。<span id="m-bt"></span></li>
-      <li>去年の新作をそれぞれの発売月・区分・アイテムのまま入れると、2026年1〜7月の月の売上のずれは Futier Land 19%（前のやり方は28%）・ABYS 34%（36%）・STELLA FISH 14%（31%）でした。同じデータで測った比べ方なので、実際の当たり方はもう少し粗いと見てください。</li>
+      <li><b>季節の波</b>：ZOZO 全体の波動データ（ZOZOTOWN のカテゴリごとの週の売上の構成比。年の平均＝1）。アイテムの中の内訳（たとえばパンツならスラックス・デニム・カーゴ）で混ぜています。自社の新作は ZOZO 全体ほど山が高くならないので、波は <span id="m-gamma"></span> 乗で使っています（型の半分で測り、残り半分で当てて決めた値）。</li>
+      <li><b>発売からの経過</b>：出してから本調子になるまでに6〜8週かかり、そのあと、季節の型ごとに落ちていきます。発売の月ではなく、アイテムの季節の型で分けています。</li>
     </ul>
-    <p>このブランドで1型出したときの月の売上（当たり×1.0・万円）：</p>
-    <div class="tblwrap"><table class="co" id="m-etable"></table></div>
-    <p>ある月に N 型出すと、そのうち「N × 縦売りの割合」の型が縦売りの強さで、「N × 中堅の割合」の型が中堅の強さで売れる、として月ごとに足しています。12月に出す型は秋冬、1〜5月に出す型は春夏の割合です。12月に出す型の12月中の売上は、目標が1月からなので数えていません。</p>
-    <p>「当たり」のつまみは、縦売りと中堅の割合を同じ倍率で上げ、その分その他を減らします。当たった型1型あたりの売上は変えていません。</p>
+    <div class="tblwrap"><table class="co" id="m-age"></table></div>
+    <p>「出す」は初めて売れた週（予約の注文を含む）です。投入月の中では、4日・11日・18日・25日に出した型の平均にしています。</p>
 
-    <h3>⑥ 型数のひな形（3つのボタン）</h3>
+    <h3>④ 強さ（どれだけ売れるか）</h3>
     <ul>
-      <li><b>去年と同じ（カレンダーどおり）</b>：時期別投入カレンダーのアイテムごとに、去年の春夏にそのアイテムで出した型数を、カレンダーの投入の月（「月別アイテム一覧 SS」の予約開始、無いものは「元データ１」の仕込み開始）に置いたものです。仕込みの時期が2か月以上にまたがるアイテム（梅春の12〜1月、「1月下旬〜2月」など）は、またがる月に均等に分けています。</li>
-      <li><b>目安（月40型の配分）</b>：12〜4月の合計を Futier Land 100型・ABYS 50型・STELLA FISH 50型にして、「去年と同じ」の月の山の形で配ったものです。</li>
-      <li><b>不足を型数で埋める</b>：「去年と同じ」の型数を全部の月で同じ倍率で増やし、今のつまみの当たりで、1〜7月の新作の売上の合計が新作で必要な金額の合計に届く、いちばん小さい倍率にしたものです（当たりを変えてから押すと、その当たりで計算し直します）。7か月の合計で届く数なので、月ごとには届かない月があります。</li>
+      <li>去年の春夏（2025年12月〜2026年5月に初めて売れた）の型の強さ（波＝1・本調子のときの週の売れ枚数）から、1型ずつランダムに抜き出します。<span id="m-pool"></span></li>
+      <li>アイテムによる差は、同じブランド・同じシーズンの平均からの差を測り、型の少ないアイテムほど差を小さくして掛けています。<span id="m-gf"></span></li>
+      <li>枚数は全チャネルです。金額は「全チャネル1枚あたりの ZOZO の売上（税抜）」を掛けて出します。去年の春夏の新作で測った値で、ZOZO の割合と売れ値の両方が入っています。<span id="m-ypu"></span></li>
     </ul>
 
-    <h3>⑦ 今年のAW並みの当たり（「今年のAW並み」のボタン）</h3>
-    <p>今年のAWの新作の立ち上がりを、去年のAWと同じ条件で比べています。<span id="m-awrange"></span>に初めて売れた新作の、発売から<span id="m-awdays"></span>日の売上（ZOZO・税抜）です。</p>
-    <div class="tblwrap"><table class="co" id="m-aw"></table></div>
-    <p>ボタンの倍率は「30日で10万円以上売れた型の割合」が去年の何倍かを、0.1刻みにしたものです。当たりのつまみと同じく、縦売りと中堅の割合にこの倍率を掛け、その分その他を増やします。当たった型1型あたりの売上は変えていません。</p>
-    <p id="m-awnote"></p>
-    <p>見ているのは30日分だけで、型数も多くありません。当たるかどうかは数型で決まるので、ぶれが大きい数字です。また今年のAWの弱さには、商品・露出・値段も絡んでいます。なので、予測ではなく「春夏も今年のAWと同じ調子なら」という見方として使ってください。既存品の見込みは、11月1〜11日の実績が見込みのペースを上回っている（ABYS 1.7倍・Futier Land 1.35倍）ため、下げていません。</p>
+    <h3>⑤ 当たり外れは1,000回くり返して引く</h3>
+    <p>型ごとに強さを抜き出して足すのを1,000回くり返し、月ごとの平均、ぶれの幅（下から10%と90%）、目標に届いた回の割合（届く確率）を出しています。大当たりは数型で決まるので、型数が少ないほど幅が広くなります。</p>
 
-    <h3>⑧ 全モールで見るとき（上の「全モール」）</h3>
-    <p>目標は予算ファイルの全モール（SHOPLIST・ZOZO・楽天・YAHOO・楽天ファッション・ジェイド・Qoo10・TikTok）の予算に、それぞれのブランド配分を掛けて足したものです。売上の見込みは、ZOZO の見込みを「予算の中の ZOZO の割合」で割って全体に広げています。<span id="m-share"></span></p>
-    <p>目標と売上を同じ割合で広げるので、達成率は「ZOZO だけ」とほぼ同じです（月ごとに割合が違う分だけ少しずれます）。金額が全モールの大きさになります。ほかのモールが予算どおりの割合で売れる前提なので、実際の割合が違うと全体の見込みもずれます（STELLA FISH は予算の ZOZO の割合が実績より低く、楽天を大きく見ています）。</p>
-
-    <h3>注意すること</h3>
+    <h3>⑥ 確かめた結果（前の年までのデータだけで、翌年の春夏を当てる）</h3>
+    <div class="tblwrap"><table class="co" id="m-bt"></table></div>
     <ul>
-      <li>出ているのは平均（期待値）です。縦売りは数が少ないので、実際は何型当たるかで大きくぶれます。縦売りの平均は大当たりの型に引っぱられて、真ん中の型より高めです。</li>
-      <li>型を増やしても、1型あたりの売上は変わらない前提です（露出の取り合いは入っていません）。値下げ・TS・PR・在庫切れの効果も入っていません。</li>
-      <li>季節の波は ZOZO 全体の1年分の波動データです。今年の天気（暖冬・早い夏など）や、ZOZO 全体の立ち上がりの早さの変化は入っていません。</li>
-      <li>楽天などほかのモールの売上は入っていません。</li>
+      <li><b>何月に売れるか（月の形）</b>は、前のやり方（発売から何か月目かだけ）とほぼ同じ当たり方です。</li>
+      <li><b>どれだけ売れるか（量）</b>は、前の年の強さをそのまま使うと、実際は 0.3〜0.9倍でした。4回とも実際のほうが少なく、平均すると約0.5倍です。新作1型の強さが年々下がってきたためです（Futier Land の平均は 2024年SS 29.9 → 2025年SS 10.2 → 2026年SS 6.8 枚/週）。</li>
+      <li>去年の実際の出し方をそのまま入れると、去年の新作の1〜7月の ZOZO の売上は、Futier Land 1.09倍・ABYS 1.04倍・STELLA FISH 0.90倍で再現できます（同じデータなので、合って当然の確かめです）。</li>
+    </ul>
+
+    <h3>⑦ 強さのつまみ</h3>
+    <ul>
+      <li><b>去年並み（×1.0）</b>：去年の春夏の型の強さのまま。</li>
+      <li><b>今年のAW並み</b>：今年のAWの新作（8/1〜9/14 に初めて売れた型の発売8週まで）の強さが、去年のAWの同じ時期の何倍か。<span id="m-aw"></span></li>
+      <li><b>これまでの下がり方（×0.5）</b>：⑥で、前の年の強さに対して実際が平均0.5倍だったことから。</li>
+    </ul>
+
+    <h3>⑧ 全モールで見るとき</h3>
+    <p>目標は予算ファイルの全モールの予算 × それぞれのブランド配分の合計。売上は ZOZO の見込みを「予算の中の ZOZO の割合」で割って全体に広げています。<span id="m-share"></span></p>
+
+    <h3>入っていないこと</h3>
+    <ul>
+      <li>在庫：初回の枚数を売り切ったら売れない、追加が届くまで欠品する、は入っていません（作る量の表は目安です）。</li>
+      <li>型を増やしたときの露出の取り合い：型を増やしても1型の強さは変わらない前提です。</li>
+      <li>値下げ・TS・PR・広告、今年の天気（季節の早い・遅い）。季節の波は ZOZO 全体の1年分です。</li>
       <li id="m-asof"></li>
     </ul>
   </section>
-
 </div>
 
 <script>
-const DATA = {"seasonA":{"冬":[0.3232974782258316,1.0,1.0,1.0,0.2652797442694099,0.08708141242918369,0.013731721406223632,0.040293760164494936,0.11444047804142662],"早春":[0.653258067327726,1.0,1.0,1.0,0.9085457561313665,0.6174447677689985,0.3701083130844708,0.41202678229039325,0.7780359010427332],"春夏":[0.3363062455225172,1.0,1.0,1.0,0.7868948657243837,0.27746413400367187,0.20560375365257602,0.20560375365257602,0.20560375365257602]},"waveEx":{"半袖Tシャツ・カットソー":[0.07,0.11,0.18,0.54,1.35,2.3,2.51,2.46],"薄手カーディガン・シアーカーデ":[1.21,1.04,1.02,1.12,0.79,0.73,0.62,0.56],"長袖ニット（梅春）":[2.41,1.63,1.18,0.73,0.26,0.13,0.09,0.09],"カーゴパンツ・カジュアルパンツ":[0.81,0.78,0.77,0.95,1.14,1.27,1.26,1.28]},"months":["2027-01","2027-02","2027-03","2027-04","2027-05","2027-06","2027-07"],"launch":["12","1","2","3","4","5"],"brands":[{"key":"futier","name":"Futier Land","target":[26250000,22500000,33750000,37500000,37500000,37500000,45000000],"existing":[12954109,13009126,19451644,12684597,16017484,10978277,12531988],"existingParts":{"継続（去年からの品番）":[6550536,9428284,15289384,10960634,14115811,9472054,9659235],"継続（今年の春夏に出した品番）":[1787125,1382297,1856009,941885,1780222,1457449,2835829],"今季の投入済み新作":[4616448,2198545,2306251,782077,121452,48775,36923]},"lastYear":[24983296,20287264,33355955,24482083,33296404,23228862,23822089],"profiles":{"秋冬":{"n":134,"p":{"縦売り":0.05970149253731343,"中堅":0.12686567164179105,"その他":0.8134328358208955},"avg90":{"縦売り":5511775,"中堅":466383,"その他":97499},"prof":{"縦売り":[886276,2347329,2119052,1561951,541351,302538,300193,123972,21990],"中堅":[53754,199986,142061,96723,46800,14879,14193,30498,17675],"その他":[20531,37260,28984,19364,9902,5959,5685,3384,2014]}},"春夏":{"n":184,"p":{"縦売り":0.03260869565217391,"中堅":0.06521739130434782,"その他":0.9021739130434783},"avg90":{"縦売り":2572884,"中堅":529434,"その他":58746},"prof":{"縦売り":[352478,988649,1128011,824462,487556,221989,155415,177336,51809],"中堅":[75395,256233,134533,90584,55290,23236,30595,14045,14803],"その他":[15112,22595,16580,10794,7224,5221,7600,10515,15976]}}},"presets":{"lastyear":{"12":15,"1":26,"2":69,"3":15,"4":17,"5":0},"guide":{"12":11,"1":18,"2":49,"3":11,"4":11,"5":0},"fill":{"12":55,"1":95,"2":250,"3":55,"4":62,"5":0}},"items":{"12":[["長袖シャツ・通常シャツ",12,"12月下旬〜1月上旬","月別アイテム一覧の予約開始"],["長袖ニット（梅春）",11,"12月〜1月","元データの仕込み開始"],["長袖ワンピース（梅春）",3,"12月〜1月","元データの仕込み開始"],["薄手スウェット・パーカー（梅春）",1,"12月〜1月","元データの仕込み開始"]],"1":[["長袖シャツ・通常シャツ",12,"12月下旬〜1月上旬","月別アイテム一覧の予約開始"],["長袖ニット（梅春）",11,"12月〜1月","元データの仕込み開始"],["スカート",9,"1月下旬〜2月／3月下旬","元データの仕込み開始"],["春ライトアウター・薄手ジャケット",8,"1月上旬〜2月上旬","月別アイテム一覧の予約開始"],["スラックス・きれいめパンツ",6,"1月下旬〜2月","元データの仕込み開始"],["薄手カーディガン・シアーカーデ",6,"1月下旬〜2月上旬","月別アイテム一覧の予約開始"],["長袖ワンピース（梅春）",3,"12月〜1月","元データの仕込み開始"],["長袖Tシャツ・ロンT",2,"1月下旬〜2月上旬","月別アイテム一覧の予約開始"],["薄手スウェット・パーカー（梅春）",1,"12月〜1月","元データの仕込み開始"]],"2":[["半袖Tシャツ・カットソー",16,"2月上旬","月別アイテム一覧の予約開始"],["シアー・薄手シャツ・羽織りシャツ",9,"2月下旬","月別アイテム一覧の予約開始"],["スカート",9,"1月下旬〜2月／3月下旬","元データの仕込み開始"],["半袖シャツ・半袖ブラウス",9,"2月下旬","月別アイテム一覧の予約開始"],["半袖・半端袖ニット・サマーニット",9,"2月下旬","月別アイテム一覧の予約開始"],["春ライトアウター・薄手ジャケット",8,"1月上旬〜2月上旬","月別アイテム一覧の予約開始"],["キャミソール",6,"2月上旬","月別アイテム一覧の予約開始"],["スラックス・きれいめパンツ",6,"1月下旬〜2月","元データの仕込み開始"],["薄手カーディガン・シアーカーデ",6,"1月下旬〜2月上旬","月別アイテム一覧の予約開始"],["袖なしブラウス・ノースリブラウス",3,"2月下旬","月別アイテム一覧の予約開始"],["半端袖Tシャツ・五分袖カットソー",2,"2月上旬","月別アイテム一覧の予約開始"],["長袖Tシャツ・ロンT",2,"1月下旬〜2月上旬","月別アイテム一覧の予約開始"],["半袖カーディガン",1,"2月下旬〜3月上旬","月別アイテム一覧の予約開始"]],"3":[["スカート",9,"1月下旬〜2月／3月下旬","元データの仕込み開始"],["カーゴパンツ・カジュアルパンツ",5,"3月上旬〜中旬","元データの仕込み開始"],["サンダル",5,"3月下旬〜4月上旬","月別アイテム一覧の予約開始"],["袖なしニット・ニットベスト",4,"3月下旬〜4月上旬","月別アイテム一覧の予約開始"],["半端袖ワンピース",2,"3月上旬〜4月上旬","月別アイテム一覧の予約開始"],["半袖ワンピース",2,"3月上旬〜4月上旬","月別アイテム一覧の予約開始"],["半袖カーディガン",1,"2月下旬〜3月上旬","月別アイテム一覧の予約開始"]],"4":[["袖なしワンピース・キャミワンピ",8,"4月上旬","月別アイテム一覧の予約開始"],["サンダル",5,"3月下旬〜4月上旬","月別アイテム一覧の予約開始"],["袖なしニット・ニットベスト",4,"3月下旬〜4月上旬","月別アイテム一覧の予約開始"],["半端袖ワンピース",2,"3月上旬〜4月上旬","月別アイテム一覧の予約開始"],["半袖ワンピース",2,"3月上旬〜4月上旬","月別アイテム一覧の予約開始"],["袖なしTシャツ・ノースリトップス",2,"4月上旬〜中旬","元データの仕込み開始"],["タンクトップ",1,"4月上旬〜中旬","月別アイテム一覧の予約開始"]]},"ratio":0.75,"aw":{"2025":{"n":51,"avg":215539,"med":39405,"hi":0.11764705882352941,"mid":0.21568627450980393},"2026":{"n":51,"avg":58336,"med":27818,"hi":0.058823529411764705,"mid":0.11764705882352941},"mult":0.5,"note":""},"total":[41831250,35075750,61042000,64083750,60796000,64922000,66645000],"malls":{"SHOPLIST":36002000,"ZOZO":240000000,"楽天":83980000,"YAHOO":2703750,"楽天F":11565000,"ジェイド":3585000,"qoo10":3645000,"TIKTOK":12915000},"arr":{"秋冬":{"縦売り":{"n":8,"init":1558.875,"add":5449.5,"cost":1873.897115950559,"price":5042.6195088019695,"sold":5110.75,"st":0.7292346656678617},"中堅":{"n":17,"init":577.9411764705883,"add":673.0588235294117,"cost":1587.879578689989,"price":4181.673719847651,"sold":864.7647058823529,"st":0.6912587576997226},"その他":{"n":108,"init":372.26851851851853,"add":311.44444444444446,"cost":1400.5675600276272,"price":3356.8847659159546,"sold":418.31481481481484,"st":0.6118281171706775},"_src":"秋冬"},"春夏":{"縦売り":{"n":6,"init":1138.5,"add":3610.0,"cost":1451.780976448703,"price":4005.4079533887893,"sold":2430.5,"st":0.5118458460566495},"中堅":{"n":12,"init":297.0833333333333,"add":316.25,"cost":1232.6709239130435,"price":3399.951766304348,"sold":323.75,"st":0.5278532608695652},"その他":{"n":165,"init":167.75757575757575,"add":73.68484848484849,"cost":1397.9000251016619,"price":3537.567397961745,"sold":129.5878787878788,"st":0.5367237311109996},"_src":"春夏"}},"fac":{"ssNew":0.23,"ssOld":0.56,"coh":[1.15,0.55,0.57,0.19,0.03,0.01,0.01]},"hits":[["13254001","【4色展開 / 風通し防止】プードルファージャケット",14643236,"2025-10"],["18254201","【7色展開】襟付きペプラムリブニットトップス/カーディガ",10897246,"2025-10"],["12253201","【6色展開】レイヤード風ロゴニットカーディガン",7127413,"2025-09"],["12261402","【裏地あり】ゆれるたびに、きれいなシルエット。 ウエスト",5467523,"2026-03"],["12234402","【新色追加】まるで毛布！裏起毛ニットロングスカート",5188898,"2025-10"],["13261219","【レイヤード対応】裾レースアシンメトリータンクトップ /",3048852,"2026-04"]],"curves":{"12":{"縦売り":[1584701,1553658,1641353,318731,74728,7703,20032],"中堅":[189989,186268,196781,38213,8959,924,2402],"その他":[30012,29424,31085,6036,1415,146,379]},"1":{"縦売り":[467692,1534749,1808441,1247579,253658,64238,9412],"中堅":[56071,184001,216813,149572,30411,7701,1128],"その他":[8858,29066,34250,23628,4804,1217,178]},"2":{"縦売り":[0,453065,1011655,1017137,1214578,1129469,740297],"中堅":[0,54318,121287,121944,145615,135412,88754],"その他":[0,8580,19160,19263,23003,21391,14020]},"3":{"縦売り":[0,0,493324,869897,1096065,1156629,1122266],"中堅":[0,0,59144,104292,131407,138668,134548],"その他":[0,0,9343,16475,20758,21905,21254]},"4":{"縦売り":[0,0,0,240366,1070562,1235665,1470707],"中堅":[0,0,0,28817,128349,148144,176323],"その他":[0,0,0,4552,20275,23402,27853]},"5":{"縦売り":[0,0,0,0,405858,1340831,1392968],"中堅":[0,0,0,0,48658,160752,167003],"その他":[0,0,0,0,7686,25394,26381]}},"season":{"mix":{"12":[["長袖シャツ・通常シャツ",0.444],["長袖ニット（梅春）",0.407],["長袖ワンピース（梅春）",0.111],["薄手スウェット・パーカー（梅春）",0.037]],"1":[["長袖シャツ・通常シャツ",0.207],["長袖ニット（梅春）",0.19],["スカート",0.155],["春ライトアウター・薄手ジャケット",0.138],["スラックス・きれいめパンツ",0.103],["薄手カーディガン・シアーカーデ",0.103],["長袖ワンピース（梅春）",0.052],["長袖Tシャツ・ロンT",0.034],["薄手スウェット・パーカー（梅春）",0.017]],"2":[["半袖Tシャツ・カットソー",0.186],["シアー・薄手シャツ・羽織りシャツ",0.105],["スカート",0.105],["半袖シャツ・半袖ブラウス",0.105],["半袖・半端袖ニット・サマーニット",0.105],["春ライトアウター・薄手ジャケット",0.093],["キャミソール",0.07],["スラックス・きれいめパンツ",0.07],["薄手カーディガン・シアーカーデ",0.07],["袖なしブラウス・ノースリブラウス",0.035],["半端袖Tシャツ・五分袖カットソー",0.023],["長袖Tシャツ・ロンT",0.023],["半袖カーディガン",0.012]],"3":[["スカート",0.321],["カーゴパンツ・カジュアルパンツ",0.179],["サンダル",0.179],["袖なしニット・ニットベスト",0.143],["半端袖ワンピース",0.071],["半袖ワンピース",0.071],["半袖カーディガン",0.036]],"4":[["袖なしワンピース・キャミワンピ",0.333],["サンダル",0.208],["袖なしニット・ニットベスト",0.167],["半端袖ワンピース",0.083],["半袖ワンピース",0.083],["袖なしTシャツ・ノースリトップス",0.083],["タンクトップ",0.042]],"5":[["半袖Tシャツ・カットソー",0.163],["サンダル",0.102],["シアー・薄手シャツ・羽織りシャツ",0.092],["半袖シャツ・半袖ブラウス",0.092],["半袖・半端袖ニット・サマーニット",0.092],["袖なしニット・ニットベスト",0.082],["袖なしワンピース・キャミワンピ",0.082],["キャミソール",0.061],["カーゴパンツ・カジュアルパンツ",0.051],["半端袖ワンピース",0.041],["半袖ワンピース",0.041],["袖なしブラウス・ノースリブラウス",0.031],["半端袖Tシャツ・五分袖カットソー",0.02],["半袖カーディガン",0.02],["袖なしTシャツ・ノースリトップス",0.02],["タンクトップ",0.01]]},"wmix":{"12":[1.178,1.155,1.22,0.893,0.638,0.417,0.37],"1":[1.076,1.141,1.345,0.928,0.711,0.548,0.51],"2":[0.506,0.631,0.994,1.191,1.563,1.65,1.594],"3":[0.655,0.661,0.817,1.045,1.388,1.491,1.605],"4":[0.391,0.452,0.703,1.094,1.638,1.891,2.251],"5":[0.316,0.404,0.727,1.232,1.847,2.052,2.132]},"bt":{"縦売り":991648,"中堅":118888,"その他":18781},"fs":{"夏物":0.6589711065211755,"それ以外":1.3563646376445142}},"zshare":[0.6275,0.6415,0.5529,0.5852,0.6168,0.5776,0.6752]},{"key":"abys","name":"ABYS","target":[7000000,6000000,9000000,10000000,10000000,10000000,12000000],"existing":[4113767,4136686,2128644,1213510,2491359,1637572,3121540],"existingParts":{"継続（去年からの品番）":[2406912,2604919,1007102,528072,712783,457961,426844],"継続（今年の春夏に出した品番）":[373615,420880,593719,519182,1717357,1157880,2681683],"今季の投入済み新作":[1333240,1110886,527823,166256,61219,21731,13014]},"lastYear":[8861269,10161613,5912495,4005963,7894516,6203714,8994924],"profiles":{"秋冬":{"n":52,"p":{"縦売り":0.09615384615384616,"中堅":0.2692307692307692,"その他":0.6346153846153846},"avg90":{"縦売り":3583179,"中堅":467021,"その他":95795},"prof":{"縦売り":[358748,1340102,1658722,965684,713542,227788,132908,99719,12636],"中堅":[70557,177970,146351,138262,69553,38006,18698,8938,3477],"その他":[19993,39488,26759,24422,20950,19548,10870,7055,5423]}},"春夏":{"n":49,"p":{"縦売り":0.08163265306122448,"中堅":0.14285714285714285,"その他":0.7755102040816326},"avg90":{"縦売り":2829144,"中堅":572412,"その他":84681},"prof":{"縦売り":[268485,713710,843036,1316524,437268,37328,4280,1148,8038],"中堅":[145341,162684,153826,269153,110239,147304,78742,104238,156569],"その他":[17406,35660,25604,13109,6792,5560,5696,12768,17575]}}},"presets":{"lastyear":{"12":8,"1":11,"2":19,"3":7,"4":2,"5":0},"guide":{"12":9,"1":12,"2":20,"3":7,"4":2,"5":0},"fill":{"12":14,"1":19,"2":33,"3":12,"4":4,"5":0}},"items":{"12":[["長袖ニット（梅春）",11,"12月〜1月","元データの仕込み開始"],["長袖シャツ・通常シャツ",3,"12月下旬〜1月上旬","月別アイテム一覧の予約開始"]],"1":[["長袖ニット（梅春）",11,"12月〜1月","元データの仕込み開始"],["薄手カーディガン・シアーカーデ",6,"1月下旬〜2月上旬","月別アイテム一覧の予約開始"],["長袖シャツ・通常シャツ",3,"12月下旬〜1月上旬","月別アイテム一覧の予約開始"],["長袖Tシャツ・ロンT",2,"1月下旬〜2月上旬","月別アイテム一覧の予約開始"],["春ライトアウター・薄手ジャケット",1,"1月上旬〜2月上旬","月別アイテム一覧の予約開始"]],"2":[["半袖Tシャツ・カットソー",9,"2月上旬","月別アイテム一覧の予約開始"],["薄手カーディガン・シアーカーデ",6,"1月下旬〜2月上旬","月別アイテム一覧の予約開始"],["キャミソール",2,"2月上旬","月別アイテム一覧の予約開始"],["シアー・薄手シャツ・羽織りシャツ",2,"2月下旬","月別アイテム一覧の予約開始"],["半袖シャツ・半袖ブラウス",2,"2月下旬","月別アイテム一覧の予約開始"],["長袖Tシャツ・ロンT",2,"1月下旬〜2月上旬","月別アイテム一覧の予約開始"],["春ライトアウター・薄手ジャケット",1,"1月上旬〜2月上旬","月別アイテム一覧の予約開始"]],"3":[["カーゴパンツ・カジュアルパンツ",6,"3月上旬〜中旬","元データの仕込み開始"],["袖なしニット・ニットベスト",2,"3月下旬〜4月上旬","月別アイテム一覧の予約開始"]],"4":[["袖なしニット・ニットベスト",2,"3月下旬〜4月上旬","月別アイテム一覧の予約開始"],["タンクトップ",1,"4月上旬〜中旬","月別アイテム一覧の予約開始"]]},"ratio":0.2,"aw":{"2025":{"n":27,"avg":129288,"med":42990,"hi":0.1111111111111111,"mid":0.2962962962962963},"2026":{"n":17,"avg":40580,"med":30393,"hi":0.0,"mid":0.11764705882352941},"mult":0.4,"note":""},"total":[7411000,6432000,9644000,10770000,10634500,10824000,12725000],"malls":{"SHOPLIST":1149000,"ZOZO":64000000,"YAHOO":721000,"楽天F":642500,"ジェイド":956000,"qoo10":972000},"arr":{"秋冬":{"縦売り":{"n":5,"init":1153.8,"add":1008.6,"cost":1771.7844987051424,"price":4979.291157972623,"sold":1515.0,"st":0.7006104328523862},"中堅":{"n":14,"init":238.71428571428572,"add":51.07142857142857,"cost":1930.2139018979547,"price":5042.688686221346,"sold":202.35714285714286,"st":0.6982992358885877},"その他":{"n":32,"init":148.1875,"add":23.8125,"cost":1798.1779069767445,"price":4621.970566860465,"sold":74.3125,"st":0.4320494186046512},"_src":"秋冬"},"春夏":{"縦売り":{"n":4,"init":596.5,"add":1083.0,"cost":1389.0659720154806,"price":3682.454004167907,"sold":1255.0,"st":0.7472462042274487},"中堅":{"n":7,"init":517.5714285714286,"add":439.14285714285717,"cost":1857.2720322532477,"price":4979.3310437509335,"sold":343.7142857142857,"st":0.35926534269075705},"その他":{"n":36,"init":226.19444444444446,"add":28.72222222222222,"cost":1455.4752751443827,"price":3851.8659692710035,"sold":50.94444444444444,"st":0.19984744469870327},"_src":"春夏"}},"fac":{"ssNew":0.47,"ssOld":0.15,"coh":[1.76,1.47,0.7,0.22,0.08,0.03,0.02]},"hits":[["58253201","《26AW 新色追加》襟付きボーダーニット",8427701,"2025-10"],["50261208","着るだけで細見え。ポコポコストライプシャーリングシャツ ",6238983,"2026-04"],["58254103","《26AW 新作》配色ステッチニットカーディガン",3825066,"2025-12"],["50253106","【新色追加】ロゴ刺繍裏起毛ショート丈トレーナー",2978431,"2025-10"],["18252203","レトロに着映える。半袖ポロニット / サマーニット・襟付",2114464,"2025-06"],["12242208","FUNNYロゴプリント半袖Tシャツ",1719070,"2025-06"]],"curves":{"12":{"縦売り":[1578538,1283094,1034784,157007,34089,3514,9362],"中堅":[242790,197348,159157,24149,5243,540,1440],"その他":[41758,33942,27374,4153,902,93,248]},"1":{"縦売り":[447355,1247791,1234456,761136,142556,33185,4661],"中堅":[68806,191918,189867,117068,21926,5104,717],"その他":[11834,33008,32656,20135,3771,878,123]},"2":{"縦売り":[0,420540,1022214,1260595,1665149,1566017,1023647],"中堅":[0,64682,157223,193888,256111,240864,157444],"その他":[0,11125,27041,33347,44049,41426,27079]},"3":{"縦売り":[0,0,621324,1100972,1273488,1317065,1268145],"中堅":[0,0,95564,169337,195871,202573,195049],"その他":[0,0,16436,29124,33688,34841,33547]},"4":{"縦売り":[0,0,0,338253,1375932,1645559,1920321],"中堅":[0,0,0,52026,211627,253098,295358],"その他":[0,0,0,8948,36398,43531,50799]},"5":{"縦売り":[0,0,0,0,613113,1986874,2006256],"中堅":[0,0,0,0,94301,305594,308575],"その他":[0,0,0,0,16219,52560,53072]}},"season":{"mix":{"12":[["長袖ニット（梅春）",0.786],["長袖シャツ・通常シャツ",0.214]],"1":[["長袖ニット（梅春）",0.478],["薄手カーディガン・シアーカーデ",0.261],["長袖シャツ・通常シャツ",0.13],["長袖Tシャツ・ロンT",0.087],["春ライトアウター・薄手ジャケット",0.043]],"2":[["半袖Tシャツ・カットソー",0.375],["薄手カーディガン・シアーカーデ",0.25],["キャミソール",0.083],["シアー・薄手シャツ・羽織りシャツ",0.083],["半袖シャツ・半袖ブラウス",0.083],["長袖Tシャツ・ロンT",0.083],["春ライトアウター・薄手ジャケット",0.042]],"3":[["カーゴパンツ・カジュアルパンツ",0.75],["袖なしニット・ニットベスト",0.25]],"4":[["袖なしニット・ニットベスト",0.667],["タンクトップ",0.333]],"5":[["半袖Tシャツ・カットソー",0.346],["カーゴパンツ・カジュアルパンツ",0.231],["袖なしニット・ニットベスト",0.154],["キャミソール",0.077],["シアー・薄手シャツ・羽織りシャツ",0.077],["半袖シャツ・半袖ブラウス",0.077],["タンクトップ",0.038]]},"wmix":{"12":[1.434,1.165,0.94,0.538,0.356,0.232,0.211],"1":[1.257,1.133,1.121,0.691,0.488,0.346,0.308],"2":[0.491,0.595,0.952,1.191,1.584,1.644,1.583],"3":[0.752,0.753,0.914,1.058,1.223,1.265,1.341],"4":[0.52,0.575,0.772,0.966,1.322,1.581,1.845],"5":[0.405,0.472,0.763,1.214,1.751,1.908,1.927]},"bt":{"縦売り":1063042,"中堅":163503,"その他":28121},"fs":{"夏物":0.979340415901593,"それ以外":1.0356410580687023}},"zshare":[0.9445,0.9328,0.9332,0.9285,0.9403,0.9239,0.943]},{"key":"stella","name":"STELLA FISH","target":[1750000,1500000,2250000,2500000,2500000,2500000,3000000],"existing":[1833363,1008674,936482,398514,410735,420713,711381],"existingParts":{"継続（去年からの品番）":[0,0,0,0,0,0,0],"継続（今年の春夏に出した品番）":[528935,203989,338108,200507,366340,403985,700042],"今季の投入済み新作":[1304427,804685,598374,198007,44395,16729,11339]},"lastYear":[19912,5592,900,23708,686137,1234102,2259409],"profiles":{"秋冬":{"n":57,"p":{"縦売り":0.017543859649122806,"中堅":0.12280701754385964,"その他":0.8596491228070176},"avg90":{"縦売り":1450804,"中堅":516273,"その他":32973},"prof":{"縦売り":[159423,323009,907247,921156,null,null,null,null,null],"中堅":[58830,186651,166085,139720,112803,37356,13118,null,null],"その他":[10450,11989,7153,5657,3731,1343,1203,67,75]}},"春夏":{"n":52,"p":{"縦売り":0.019230769230769232,"中堅":0.1346153846153846,"その他":0.8461538461538461},"avg90":{"縦売り":1450804,"中堅":516273,"その他":35731},"prof":{"縦売り":[159423,323009,907247,921156,null,null,null,null,null],"中堅":[58830,186651,166085,139720,112803,37356,13118,null,null],"その他":[10817,13222,7927,6150,4197,1583,1490,85,95]}}},"presets":{"lastyear":{"12":0,"1":3,"2":13,"3":10,"4":4,"5":0},"guide":{"12":0,"1":5,"2":21,"3":17,"4":7,"5":0},"fill":{"12":0,"1":7,"2":27,"3":21,"4":9,"5":0}},"items":{"12":[],"1":[["スカート",2,"1月下旬〜2月／3月下旬","元データの仕込み開始"],["スラックス・きれいめパンツ",1,"1月下旬〜2月","元データの仕込み開始"],["薄手カーディガン・シアーカーデ",1,"1月下旬〜2月上旬","月別アイテム一覧の予約開始"]],"2":[["半袖Tシャツ・カットソー",8,"2月上旬","月別アイテム一覧の予約開始"],["スカート",2,"1月下旬〜2月／3月下旬","元データの仕込み開始"],["袖なしブラウス・ノースリブラウス",2,"2月下旬","月別アイテム一覧の予約開始"],["スラックス・きれいめパンツ",1,"1月下旬〜2月","元データの仕込み開始"],["半袖カーディガン",1,"2月下旬〜3月上旬","月別アイテム一覧の予約開始"],["半袖シャツ・半袖ブラウス",1,"2月下旬","月別アイテム一覧の予約開始"],["薄手カーディガン・シアーカーデ",1,"1月下旬〜2月上旬","月別アイテム一覧の予約開始"]],"3":[["カーゴパンツ・カジュアルパンツ",7,"3月上旬〜中旬","元データの仕込み開始"],["半袖ワンピース",3,"3月上旬〜4月上旬","月別アイテム一覧の予約開始"],["スカート",2,"1月下旬〜2月／3月下旬","元データの仕込み開始"],["袖なしニット・ニットベスト",2,"3月下旬〜4月上旬","月別アイテム一覧の予約開始"],["半袖カーディガン",1,"2月下旬〜3月上旬","月別アイテム一覧の予約開始"]],"4":[["半袖ワンピース",3,"3月上旬〜4月上旬","月別アイテム一覧の予約開始"],["袖なしTシャツ・ノースリトップス",2,"4月上旬〜中旬","元データの仕込み開始"],["袖なしニット・ニットベスト",2,"3月下旬〜4月上旬","月別アイテム一覧の予約開始"]]},"ratio":0.05,"aw":{"2025":{"n":3,"avg":7902,"med":5427,"hi":0.0,"mid":0.0},"2026":{"n":19,"avg":35472,"med":23058,"hi":0.0,"mid":0.05263157894736842},"mult":null,"note":"去年のAWの新作が3型しかなく、比べられません。"},"total":[3662750,2957250,5914000,5571250,5319500,5854000,5430000],"malls":{"SHOPLIST":1149000,"ZOZO":16000000,"楽天":14820000,"YAHOO":180250,"楽天F":642500,"ジェイド":239000,"qoo10":243000,"TIKTOK":1435000},"arr":{"秋冬":{"縦売り":{"n":1,"init":494.0,"add":3607.0,"cost":650.2,"price":2445.0,"sold":1329.0,"st":0.324067300658376},"中堅":{"n":7,"init":401.14285714285717,"add":241.0,"cost":1313.4718576195776,"price":3769.717463848721,"sold":267.2857142857143,"st":0.4162402669632925},"その他":{"n":37,"init":109.0,"add":19.18918918918919,"cost":1705.5464473961629,"price":4654.83238456673,"sold":23.945945945945947,"st":0.18680160236137466},"_src":"通年"},"春夏":{"縦売り":{"n":1,"init":494.0,"add":3607.0,"cost":650.2,"price":2445.0,"sold":1329.0,"st":0.324067300658376},"中堅":{"n":7,"init":401.14285714285717,"add":241.0,"cost":1313.4718576195776,"price":3769.717463848721,"sold":267.2857142857143,"st":0.4162402669632925},"その他":{"n":35,"init":114.51428571428572,"add":19.685714285714287,"cost":1694.142388758782,"price":4620.37726208218,"sold":25.314285714285713,"st":0.1886310410900575},"_src":"春夏"}},"fac":{"ssNew":0.31,"ssOld":0.55,"coh":[1.33,0.82,0.61,0.2,0.04,0.02,0.01]},"hits":[["14261810","ボタニカル大判スカーフ",1450804,"2026-07"]],"curves":{"12":{"縦売り":[1488420,1459262,1541629,299366,70188,7235,18815],"中堅":[214715,210509,222391,43186,10125,1044,2714],"その他":[19694,19308,20398,3961,929,96,249]},"1":{"縦売り":[415995,1280416,1344946,1091534,290741,89913,14047],"中堅":[60010,184709,194018,157462,41941,12971,2026],"その他":[5504,16942,17795,14442,3847,1190,186]},"2":{"縦売り":[0,295505,686496,1044067,1615346,1665580,1147113],"中堅":[0,42629,99032,150614,233025,240272,165479],"その他":[0,3910,9083,13814,21373,22038,15178]},"3":{"縦売り":[0,0,496382,952321,1237561,1302078,1240518],"中堅":[0,0,71607,137379,178527,187834,178954],"その他":[0,0,6568,12601,16375,17228,16414]},"4":{"縦売り":[0,0,0,288807,1428348,1711216,2079680],"中堅":[0,0,0,41663,206050,246855,300009],"その他":[0,0,0,3821,18899,22642,27517]},"5":{"縦売り":[0,0,0,0,503175,1707572,1829779],"中堅":[0,0,0,0,72587,246330,263959],"その他":[0,0,0,0,6658,22594,24210]}},"season":{"mix":{"12":[["長袖シャツ・通常シャツ",0.444],["長袖ニット（梅春）",0.407],["長袖ワンピース（梅春）",0.111],["薄手スウェット・パーカー（梅春）",0.037]],"1":[["スカート",0.5],["スラックス・きれいめパンツ",0.25],["薄手カーディガン・シアーカーデ",0.25]],"2":[["半袖Tシャツ・カットソー",0.5],["スカート",0.125],["袖なしブラウス・ノースリブラウス",0.125],["スラックス・きれいめパンツ",0.062],["半袖カーディガン",0.062],["半袖シャツ・半袖ブラウス",0.062],["薄手カーディガン・シアーカーデ",0.062]],"3":[["カーゴパンツ・カジュアルパンツ",0.467],["半袖ワンピース",0.2],["スカート",0.133],["袖なしニット・ニットベスト",0.133],["半袖カーディガン",0.067]],"4":[["半袖ワンピース",0.429],["袖なしTシャツ・ノースリトップス",0.286],["袖なしニット・ニットベスト",0.286]],"5":[["半袖Tシャツ・カットソー",0.25],["カーゴパンツ・カジュアルパンツ",0.219],["半袖ワンピース",0.188],["袖なしニット・ニットベスト",0.125],["半袖カーディガン",0.062],["袖なしブラウス・ノースリブラウス",0.062],["袖なしTシャツ・ノースリトップス",0.062],["半袖シャツ・半袖ブラウス",0.031]]},"wmix":{"12":[1.178,1.155,1.22,0.893,0.638,0.417,0.37],"1":[1.019,1.014,1.065,0.864,0.868,0.817,0.81],"2":[0.362,0.411,0.684,1.136,1.817,2.084,2.114],"3":[0.642,0.646,0.839,1.079,1.419,1.498,1.572],"4":[0.314,0.364,0.609,1.025,1.704,2.042,2.481],"5":[0.356,0.399,0.673,1.138,1.785,2.037,2.183]},"bt":{"縦売り":1027345,"中堅":148202,"その他":13593},"fs":{"夏物":0.8157974130494217,"それ以外":1.2296899079205652}},"zshare":[0.4778,0.5072,0.3805,0.4487,0.47,0.4271,0.5525]}],"zozo":[35000000,30000000,45000000,50000000,50000000,50000000,60000000],"asof":"売上集計 2026年11月11日まで・売上推移表 2026/11/9 版","aw":{"days":30,"range":"8/1〜10/12"}};
+const DATA = {"months":["2027-01","2027-02","2027-03","2027-04","2027-05","2027-06","2027-07"],"launch":["12","1","2","3","4","5"],"groups":["長袖シャツ・ブラウス","シアー・羽織りシャツ","半袖・袖なしシャツ・ブラウス","長袖カットソー","半袖・袖なしカットソー","キャミ・タンク","長袖ニット","カーディガン","サマーニット・ベスト","スウェット・パーカー","長袖ワンピース","半袖・袖なしワンピース","スカート","パンツ","アウター・ジャケット","コート","オールインワン・セットアップ","シューズ"],"zozo":[35000000,30000000,45000000,50000000,50000000,50000000,60000000],"asof":"売上推移表 2026/11/9 版（全チャネル・週ごと 2024年1月〜）・売上集計 2026年11月15日まで","A":{"冬物":[0.326,0.514,0.629,0.75,0.866,1.031,0.934,1.169,1.046,0.983,0.744,0.481,0.167,0.115],"春物":[0.647,0.761,0.752,0.912,0.823,0.99,1.111,1.076,0.859,0.536,0.288,0.252,0.184,0.172],"夏物":[0.52,0.613,0.773,0.723,0.892,1.059,0.964,1.086,0.837,0.78,0.563,0.38,0.184,0.11],"通年":[0.446,0.577,0.656,0.689,0.824,0.942,1.08,1.153,1.003,0.699,0.491,0.536,0.392,0.172]},"bins":["0〜0週","1〜1週","2〜2週","3〜3週","4〜5週","6〜7週","8〜9週","10〜12週","13〜16週","17〜20週","21〜26週","27〜34週","35〜52週","53週〜"],"gamma":0.8,"mix":{"長袖シャツ・ブラウス":[["シャツ/ブラウス","春物",1.0]],"シアー・羽織りシャツ":[["シャツ/ブラウス","春物",1.0]],"半袖・袖なしシャツ・ブラウス":[["シャツ/ブラウス(半端袖)","春物",0.133],["シャツ/ブラウス(半袖)","夏物",0.467],["シャツ/ブラウス(袖なし)","夏物",0.4]],"長袖カットソー":[["Tシャツ/カットソー","春物",0.947],["Tシャツ/カットソー(長袖)","春物",0.053]],"半袖・袖なしカットソー":[["Tシャツ/カットソー(半端袖)","春物",0.167],["Tシャツ/カットソー(半袖)","夏物",0.375],["Tシャツ/カットソー(袖なし)","夏物",0.458]],"キャミ・タンク":[["キャミソール","夏物",0.72],["タンクトップ","夏物",0.28]],"長袖ニット":[["ニット/セーター(長袖)","冬物",1.0]],"カーディガン":[["カーディガン/ボレロ","冬物",1.0]],"サマーニット・ベスト":[["ニット/セーター(半袖)","夏物",0.524],["ニット/セーター(袖なし)","夏物",0.143],["ベスト","通年",0.333]],"スウェット・パーカー":[["スウェット","冬物",0.846],["パーカー","冬物",0.154]],"長袖ワンピース":[["ワンピース","通年",1.0]],"半袖・袖なしワンピース":[["ワンピース(半袖)","夏物",0.034],["ワンピース(袖なし)","夏物",0.966]],"スカート":[["_avg_スカート","冬物",0.651],["スカート(ショート・ミニ丈)","冬物",0.047],["スカート(ロング・マキシ丈)","通年",0.302]],"パンツ":[["その他パンツ","通年",0.339],["カーゴパンツ","春物",0.081],["スウェットパンツ","通年",0.065],["スラックス","通年",0.371],["デニムパンツ","通年",0.145]],"アウター・ジャケット":[["その他アウター","冬物",0.259],["テーラードジャケット","春物",0.259],["デニムジャケット","春物",0.111],["ノーカラージャケット","冬物",0.074],["ブルゾン","冬物",0.185],["マウンテンパーカー","春物",0.074],["ライダースジャケット","冬物",0.037]],"コート":[["ダウンジャケット/コート","冬物",0.167],["チェスターコート","冬物",0.333],["ノーカラーコート","冬物",0.167],["ピーコート","冬物",0.167],["ムートンコート","冬物",0.167]],"オールインワン・セットアップ":[["つなぎ/オールインワン","夏物",0.5],["サロペット/オーバーオール","夏物",0.5]],"シューズ":[["サンダル","夏物",0.493],["パンプス","春物",0.388],["ブーツ","冬物",0.119]]},"gf":{"長袖シャツ・ブラウス":1.221,"シアー・羽織りシャツ":1.165,"半袖・袖なしシャツ・ブラウス":1.504,"長袖カットソー":1.197,"半袖・袖なしカットソー":1.304,"キャミ・タンク":1.045,"長袖ニット":0.99,"カーディガン":1.082,"サマーニット・ベスト":1.37,"スウェット・パーカー":1.841,"長袖ワンピース":0.889,"半袖・袖なしワンピース":0.89,"スカート":1.079,"パンツ":0.914,"アウター・ジャケット":0.564,"コート":0.977,"オールインワン・セットアップ":0.712,"シューズ":0.529},"units":{"長袖シャツ・ブラウス":{"12":[2.1794,3.4128,5.1197,3.7476,2.3091,1.6228,1.4579],"1":[1.1196,2.7641,5.6488,5.4964,4.1903,2.1603,1.6039],"2":[0.0,1.2784,4.5649,5.9901,6.0969,3.9289,2.1733],"3":[0.0,0.0,2.2893,4.9359,6.6509,5.5699,3.7284],"4":[0.0,0.0,0.0,2.2737,5.4089,6.2152,5.5377],"5":[0.0,0.0,0.0,0.0,2.5324,5.0863,6.1112]},"シアー・羽織りシャツ":{"12":[2.1794,3.4128,5.1197,3.7476,2.3091,1.6228,1.4579],"1":[1.1196,2.7641,5.6488,5.4964,4.1903,2.1603,1.6039],"2":[0.0,1.2784,4.5649,5.9901,6.0969,3.9289,2.1733],"3":[0.0,0.0,2.2893,4.9359,6.6509,5.5699,3.7284],"4":[0.0,0.0,0.0,2.2737,5.4089,6.2152,5.5377],"5":[0.0,0.0,0.0,0.0,2.5324,5.0863,6.1112]},"半袖・袖なしシャツ・ブラウス":{"12":[0.9279,1.3327,2.5899,3.3338,4.3529,4.3153,3.6769],"1":[0.4046,1.1243,2.8214,4.0886,5.7718,5.4509,4.8423],"2":[0.0,0.4504,2.3493,4.4513,7.0733,7.1808,6.1236],"3":[0.0,0.0,1.0827,3.8363,7.5923,8.5227,7.7927],"4":[0.0,0.0,0.0,1.7006,6.3974,9.3533,9.4688],"5":[0.0,0.0,0.0,0.0,2.7075,7.9877,10.2053]},"長袖カットソー":{"12":[2.0291,2.8773,4.6181,3.5006,2.2656,1.6052,1.4763],"1":[1.0081,2.331,5.108,5.1428,4.1112,2.1334,1.6229],"2":[0.0,1.0808,4.1289,5.6181,5.9787,3.8818,2.1933],"3":[0.0,0.0,2.0945,4.6313,6.5185,5.5075,3.7644],"4":[0.0,0.0,0.0,2.159,5.2994,6.1523,5.6003],"5":[0.0,0.0,0.0,0.0,2.4718,5.0361,6.1906]},"半袖・袖なしカットソー":{"12":[0.8356,1.1772,2.4075,3.8896,4.5295,3.9511,3.5786],"1":[0.3639,0.9927,2.6474,4.8104,6.044,4.9971,4.6768],"2":[0.0,0.4,2.2176,5.2286,7.4606,6.6325,5.9207],"3":[0.0,0.0,1.0673,4.4888,7.9838,7.9322,7.6042],"4":[0.0,0.0,0.0,1.976,6.6989,8.6928,9.2691],"5":[0.0,0.0,0.0,0.0,2.7903,7.3974,10.0403]},"キャミ・タンク":{"12":[1.6266,2.2939,3.9195,4.5009,4.2851,3.4957,2.8337],"1":[0.6933,1.9511,4.2328,5.3411,5.4336,4.3966,3.7615],"2":[0.0,0.758,3.5336,5.7241,6.4981,5.5978,4.7387],"3":[0.0,0.0,1.5465,4.9285,6.9026,6.5195,5.9024],"4":[0.0,0.0,0.0,2.0022,5.8148,7.1055,7.0113],"5":[0.0,0.0,0.0,0.0,2.3175,6.0775,7.5677]},"長袖ニット":{"12":[5.4725,4.613,3.759,1.4552,0.717,0.3994,0.3133],"1":[1.7712,3.6874,3.4359,1.5908,0.8737,0.4981,0.4252],"2":[0.0,1.0176,2.6564,1.4428,0.9544,0.6112,0.5317],"3":[0.0,0.0,0.8218,1.1647,0.8793,0.6623,0.6462],"4":[0.0,0.0,0.0,0.3182,0.7002,0.6181,0.708],"5":[0.0,0.0,0.0,0.0,0.2114,0.5041,0.6669]},"カーディガン":{"12":[3.8448,4.1193,5.2966,3.5662,2.8204,1.9345,1.3412],"1":[1.2796,3.3245,4.8856,3.8973,3.4576,2.4117,1.8399],"2":[0.0,0.9897,3.8331,3.5691,3.7763,2.9578,2.2936],"3":[0.0,0.0,1.2829,2.9201,3.5051,3.2057,2.7731],"4":[0.0,0.0,0.0,0.8799,2.8162,2.9896,3.0372],"5":[0.0,0.0,0.0,0.0,0.9072,2.4371,2.8384]},"サマーニット・ベスト":{"12":[1.8298,2.2642,3.4172,3.6678,4.0432,3.368,2.6854],"1":[0.7493,1.7896,3.5367,4.487,5.3144,4.132,3.2965],"2":[0.0,0.6657,2.8097,4.6763,6.4755,5.4033,4.0506],"3":[0.0,0.0,1.2133,3.9025,6.7714,6.4359,5.1674],"4":[0.0,0.0,0.0,1.592,5.5745,6.8691,6.3094],"5":[0.0,0.0,0.0,0.0,2.2533,5.7291,6.6594]},"スウェット・パーカー":{"12":[4.7489,4.9803,5.4371,2.5557,1.1101,0.568,0.4236],"1":[1.5807,4.012,4.9961,2.7941,1.3528,0.7076,0.5754],"2":[0.0,1.1765,3.8957,2.5271,1.4779,0.8658,0.7193],"3":[0.0,0.0,1.2624,2.0322,1.3622,0.9386,0.8739],"4":[0.0,0.0,0.0,0.5391,1.085,0.8731,0.9572],"5":[0.0,0.0,0.0,0.0,0.3291,0.7094,0.901]},"長袖ワンピース":{"12":[2.8953,3.3435,4.2662,3.3394,2.8102,2.5899,3.1831],"1":[1.1385,2.487,4.1667,4.4117,4.1463,2.8451,2.9998],"2":[0.0,0.8953,3.0573,4.2897,5.4388,4.2033,3.3403],"3":[0.0,0.0,1.2495,3.2786,5.3433,5.4378,4.7444],"4":[0.0,0.0,0.0,1.2566,3.9847,5.4082,6.3428],"5":[0.0,0.0,0.0,0.0,1.563,4.0891,6.2719]},"半袖・袖なしワンピース":{"12":[2.3001,2.5862,3.5856,3.5405,3.7537,3.1752,2.9693],"1":[0.9559,2.1896,3.8488,4.2036,4.7725,3.995,3.9384],"2":[0.0,0.8263,3.1925,4.5006,5.6976,5.0896,4.959],"3":[0.0,0.0,1.3544,3.8718,6.0715,5.9239,6.1847],"4":[0.0,0.0,0.0,1.565,5.1305,6.4635,7.3409],"5":[0.0,0.0,0.0,0.0,2.0816,5.5332,7.9328]},"スカート":{"12":[3.7798,4.0321,4.8125,3.5532,2.9023,2.2607,1.9428],"1":[1.3268,3.177,4.5167,4.0991,3.7383,2.7326,2.3807],"2":[0.0,0.99,3.4723,3.8244,4.3113,3.5282,2.8836],"3":[0.0,0.0,1.2379,3.0666,4.0766,4.0296,3.6336],"4":[0.0,0.0,0.0,1.0039,3.1979,3.8432,4.2193],"5":[0.0,0.0,0.0,0.0,1.1027,3.0633,4.0116]},"パンツ":{"12":[3.2754,4.0377,5.0428,3.4503,2.5556,2.182,2.3612],"1":[1.3339,3.0191,4.9566,4.5894,3.8312,2.4307,2.2427],"2":[0.0,1.1015,3.6593,4.4972,5.0637,3.6485,2.5336],"3":[0.0,0.0,1.5095,3.4601,5.015,4.7517,3.6509],"4":[0.0,0.0,0.0,1.3343,3.7711,4.7699,4.9204],"5":[0.0,0.0,0.0,0.0,1.496,3.6331,4.9097]},"アウター・ジャケット":{"12":[4.4274,5.1472,6.6849,2.621,1.1438,0.6381,0.4832],"1":[1.6992,4.1576,6.8136,3.3776,1.7129,0.8224,0.6031],"2":[0.0,1.5823,5.4169,3.3869,2.215,1.2271,0.7757],"3":[0.0,0.0,2.2676,2.7631,2.2701,1.5507,1.0996],"4":[0.0,0.0,0.0,0.9828,1.8342,1.6135,1.4187],"5":[0.0,0.0,0.0,0.0,0.7422,1.3169,1.468]},"コート":{"12":[6.1789,4.0102,1.9241,0.5359,0.2577,0.1752,0.1713],"1":[1.9056,3.1818,1.7414,0.5857,0.3151,0.2188,0.2305],"2":[0.0,0.8219,1.3196,0.5274,0.3442,0.2694,0.2889],"3":[0.0,0.0,0.3676,0.4203,0.3182,0.2918,0.3527],"4":[0.0,0.0,0.0,0.105,0.2546,0.2735,0.3864],"5":[0.0,0.0,0.0,0.0,0.0795,0.224,0.3662]},"オールインワン・セットアップ":{"12":[2.6275,3.1806,3.8218,3.6273,3.4423,2.7188,2.6769],"1":[1.0988,2.69,4.0926,4.3144,4.3621,3.4217,3.5571],"2":[0.0,1.0087,3.3846,4.6049,5.22,4.3578,4.4813],"3":[0.0,0.0,1.416,3.9493,5.5396,5.0727,5.5768],"4":[0.0,0.0,0.0,1.5688,4.6622,5.5343,6.6286],"5":[0.0,0.0,0.0,0.0,1.8474,4.7366,7.1475]},"シューズ":{"12":[2.2395,2.7062,3.6331,3.5157,3.3018,2.7079,2.3514],"1":[0.9667,2.2084,3.9149,4.4928,4.5431,3.4394,3.0433],"2":[0.0,0.9093,3.1934,4.8368,5.7227,4.6937,3.8703],"3":[0.0,0.0,1.4787,4.1044,6.1095,5.7132,5.0803],"4":[0.0,0.0,0.0,1.7735,5.0889,6.2544,6.3216],"5":[0.0,0.0,0.0,0.0,2.1239,5.2934,6.83]}},"brands":[{"key":"futier","name":"Futier Land","target":[26250000,22500000,33750000,37500000,37500000,37500000,45000000],"existing":[12954109,13009126,19451644,12684597,16017484,10978277,12531988],"existingParts":{"継続（去年からの品番）":[6550536,9428284,15289384,10960634,14115811,9472054,9659235],"継続（今年の春夏に出した品番）":[1787125,1382297,1856009,941885,1780222,1457449,2835829],"今季の投入済み新作":[4616448,2198545,2306251,782077,121452,48775,36923]},"lastYear":[24983296,20287264,33355955,24482083,33296404,23228862,23822089],"total":[41831250,35075750,61042000,64083750,60796000,64922000,66645000],"malls":{"SHOPLIST":36002000,"ZOZO":240000000,"楽天":83980000,"YAHOO":2703750,"楽天F":11565000,"ジェイド":3585000,"qoo10":3645000,"TIKTOK":12915000},"zshare":[0.6275,0.6415,0.5529,0.5852,0.6168,0.5776,0.6752],"ratio":0.75,"fac":{"ssNew":0.23,"ssOld":0.56,"coh":[1.15,0.55,0.57,0.19,0.03,0.01,0.01]},"pool":[0.028,0.087,0.186,0.304,0.401,0.43,0.439,0.504,0.536,0.548,0.586,0.645,0.651,0.664,0.675,0.68,0.689,0.732,0.742,0.752,0.761,0.806,0.822,0.839,0.841,0.858,0.866,0.917,1.035,1.045,1.095,1.103,1.111,1.122,1.129,1.138,1.171,1.253,1.271,1.278,1.294,1.31,1.338,1.339,1.342,1.408,1.455,1.67,1.752,1.814,1.921,2.119,2.149,2.189,2.286,2.297,2.3,2.315,2.334,2.452,2.489,2.593,2.825,3.03,3.182,3.203,3.205,3.207,3.23,3.313,3.348,3.371,3.419,3.738,4.025,4.044,4.249,4.419,4.592,4.662,4.663,4.862,4.982,5.301,5.563,5.775,5.926,5.929,5.954,5.965,6.232,6.308,6.661,6.866,7.179,7.699,7.875,8.745,9.089,9.106,9.665,9.752,9.939,10.255,10.351,10.694,10.804,11.171,12.999,15.607,21.623,48.644,58.937,91.019,144.943],"poolN":115,"poolMean":6.479,"ypu":{"長袖シャツ・ブラウス":2862,"シアー・羽織りシャツ":1648,"半袖・袖なしシャツ・ブラウス":1903,"長袖カットソー":1100,"半袖・袖なしカットソー":1818,"キャミ・タンク":1587,"長袖ニット":1782,"カーディガン":2079,"サマーニット・ベスト":2198,"スウェット・パーカー":1577,"長袖ワンピース":1288,"半袖・袖なしワンピース":2977,"スカート":3153,"パンツ":2007,"アウター・ジャケット":2507,"コート":2173,"オールインワン・セットアップ":2173,"シューズ":2041},"presets":{"actual":{"長袖シャツ・ブラウス":{"12":0,"1":1,"2":12,"3":1,"4":2,"5":0},"シアー・羽織りシャツ":{"12":0,"1":0,"2":1,"3":3,"4":1,"5":0},"半袖・袖なしシャツ・ブラウス":{"12":0,"1":0,"2":0,"3":1,"4":1,"5":1},"長袖カットソー":{"12":0,"1":1,"2":2,"3":1,"4":4,"5":5},"半袖・袖なしカットソー":{"12":0,"1":0,"2":0,"3":1,"4":0,"5":1},"キャミ・タンク":{"12":0,"1":0,"2":0,"3":2,"4":2,"5":3},"長袖ニット":{"12":5,"1":2,"2":2,"3":0,"4":1,"5":6},"カーディガン":{"12":1,"1":2,"2":2,"3":1,"4":1,"5":0},"サマーニット・ベスト":{"12":0,"1":0,"2":1,"3":0,"4":0,"5":2},"スウェット・パーカー":{"12":0,"1":1,"2":0,"3":0,"4":0,"5":0},"長袖ワンピース":{"12":0,"1":0,"2":2,"3":3,"4":2,"5":1},"半袖・袖なしワンピース":{"12":0,"1":0,"2":0,"3":2,"4":3,"5":0},"スカート":{"12":0,"1":0,"2":1,"3":3,"4":3,"5":0},"パンツ":{"12":1,"1":0,"2":1,"3":2,"4":7,"5":0},"アウター・ジャケット":{"12":1,"1":1,"2":1,"3":2,"4":1,"5":1},"コート":{"12":0,"1":0,"2":0,"3":0,"4":0,"5":0},"オールインワン・セットアップ":{"12":0,"1":0,"2":0,"3":0,"4":0,"5":0},"シューズ":{"12":0,"1":0,"2":0,"3":0,"4":1,"5":3}},"calendar":{"長袖シャツ・ブラウス":{"12":6,"1":6,"2":0,"3":0,"4":0,"5":0},"シアー・羽織りシャツ":{"12":0,"1":0,"2":9,"3":0,"4":0,"5":0},"半袖・袖なしシャツ・ブラウス":{"12":0,"1":0,"2":12,"3":0,"4":0,"5":0},"長袖カットソー":{"12":0,"1":1,"2":1,"3":0,"4":0,"5":0},"半袖・袖なしカットソー":{"12":0,"1":0,"2":18,"3":0,"4":2,"5":0},"キャミ・タンク":{"12":0,"1":0,"2":6,"3":0,"4":1,"5":0},"長袖ニット":{"12":6,"1":5,"2":0,"3":0,"4":0,"5":0},"カーディガン":{"12":0,"1":3,"2":4,"3":0,"4":0,"5":0},"サマーニット・ベスト":{"12":0,"1":0,"2":9,"3":2,"4":2,"5":0},"スウェット・パーカー":{"12":1,"1":0,"2":0,"3":0,"4":0,"5":0},"長袖ワンピース":{"12":2,"1":1,"2":0,"3":0,"4":0,"5":0},"半袖・袖なしワンピース":{"12":0,"1":0,"2":0,"3":2,"4":10,"5":0},"スカート":{"12":0,"1":3,"2":3,"3":3,"4":0,"5":0},"パンツ":{"12":0,"1":3,"2":3,"3":5,"4":0,"5":0},"アウター・ジャケット":{"12":0,"1":4,"2":4,"3":0,"4":0,"5":0},"コート":{"12":0,"1":0,"2":0,"3":0,"4":0,"5":0},"オールインワン・セットアップ":{"12":0,"1":0,"2":0,"3":0,"4":0,"5":0},"シューズ":{"12":0,"1":0,"2":0,"3":3,"4":2,"5":0}},"guide":{"長袖シャツ・ブラウス":{"12":4,"1":4,"2":0,"3":0,"4":0,"5":0},"シアー・羽織りシャツ":{"12":0,"1":0,"2":6,"3":0,"4":0,"5":0},"半袖・袖なしシャツ・ブラウス":{"12":0,"1":0,"2":8,"3":0,"4":0,"5":0},"長袖カットソー":{"12":0,"1":1,"2":1,"3":0,"4":0,"5":0},"半袖・袖なしカットソー":{"12":0,"1":0,"2":13,"3":0,"4":1,"5":0},"キャミ・タンク":{"12":0,"1":0,"2":4,"3":0,"4":1,"5":0},"長袖ニット":{"12":4,"1":4,"2":0,"3":0,"4":0,"5":0},"カーディガン":{"12":0,"1":2,"2":3,"3":0,"4":0,"5":0},"サマーニット・ベスト":{"12":0,"1":0,"2":6,"3":1,"4":1,"5":0},"スウェット・パーカー":{"12":1,"1":0,"2":0,"3":0,"4":0,"5":0},"長袖ワンピース":{"12":1,"1":1,"2":0,"3":0,"4":0,"5":0},"半袖・袖なしワンピース":{"12":0,"1":0,"2":0,"3":1,"4":7,"5":0},"スカート":{"12":0,"1":2,"2":2,"3":2,"4":0,"5":0},"パンツ":{"12":0,"1":2,"2":2,"3":4,"4":0,"5":0},"アウター・ジャケット":{"12":0,"1":3,"2":3,"3":0,"4":0,"5":0},"コート":{"12":0,"1":0,"2":0,"3":0,"4":0,"5":0},"オールインワン・セットアップ":{"12":0,"1":0,"2":0,"3":0,"4":0,"5":0},"シューズ":{"12":0,"1":0,"2":0,"3":2,"4":1,"5":0}}},"calmark":{"長袖シャツ・ブラウス":{"12":1,"1":1,"2":0,"3":0,"4":0,"5":0},"シアー・羽織りシャツ":{"12":0,"1":0,"2":1,"3":0,"4":0,"5":0},"半袖・袖なしシャツ・ブラウス":{"12":0,"1":0,"2":1,"3":0,"4":0,"5":0},"長袖カットソー":{"12":0,"1":1,"2":1,"3":0,"4":0,"5":0},"半袖・袖なしカットソー":{"12":0,"1":0,"2":1,"3":0,"4":1,"5":0},"キャミ・タンク":{"12":0,"1":0,"2":1,"3":0,"4":1,"5":0},"長袖ニット":{"12":1,"1":1,"2":0,"3":0,"4":0,"5":0},"カーディガン":{"12":0,"1":1,"2":1,"3":1,"4":0,"5":0},"サマーニット・ベスト":{"12":0,"1":0,"2":1,"3":1,"4":1,"5":0},"スウェット・パーカー":{"12":1,"1":1,"2":0,"3":0,"4":0,"5":0},"長袖ワンピース":{"12":1,"1":1,"2":0,"3":0,"4":0,"5":0},"半袖・袖なしワンピース":{"12":0,"1":0,"2":0,"3":1,"4":1,"5":0},"スカート":{"12":0,"1":1,"2":1,"3":1,"4":0,"5":0},"パンツ":{"12":0,"1":1,"2":1,"3":1,"4":0,"5":0},"アウター・ジャケット":{"12":0,"1":1,"2":1,"3":0,"4":0,"5":0},"コート":{"12":0,"1":0,"2":0,"3":0,"4":0,"5":0},"オールインワン・セットアップ":{"12":0,"1":0,"2":0,"3":0,"4":0,"5":0},"シューズ":{"12":0,"1":0,"2":0,"3":1,"4":1,"5":0}},"aw":{"mult":0.41,"n25":15,"n26":26,"mean25":22.30895759765999,"mean26":9.067777730038248},"arr":{"init":208.1,"add":205.5,"sold":217.8,"cost":1402.1,"price":3700.3,"n":183},"hits":[["12261402","プリーツロングスカート",156.3,"2026-03","スカート"],["18254118","シアーＶネックカーディガン",98.5,"2026-03","カーディガン"],["13261219","裾レースアシンメトリータンクトップ",76.9,"2026-03","半袖・袖なしカットソー"],["14261805","インナーパンツ",44.4,"2026-04","パンツ"],["10254229","タックギャザーブラウス",26.4,"2026-01","長袖シャツ・ブラウス"]]},{"key":"abys","name":"ABYS","target":[7000000,6000000,9000000,10000000,10000000,10000000,12000000],"existing":[4113767,4136686,2128644,1213510,2491359,1637572,3121540],"existingParts":{"継続（去年からの品番）":[2406912,2604919,1007102,528072,712783,457961,426844],"継続（今年の春夏に出した品番）":[373615,420880,593719,519182,1717357,1157880,2681683],"今季の投入済み新作":[1333240,1110886,527823,166256,61219,21731,13014]},"lastYear":[8861269,10161613,5912495,4005963,7894516,6203714,8994924],"total":[7411000,6432000,9644000,10770000,10634500,10824000,12725000],"malls":{"SHOPLIST":1149000,"ZOZO":64000000,"YAHOO":721000,"楽天F":642500,"ジェイド":956000,"qoo10":972000},"zshare":[0.9445,0.9328,0.9332,0.9285,0.9403,0.9239,0.943],"ratio":0.2,"fac":{"ssNew":0.47,"ssOld":0.15,"coh":[1.76,1.47,0.7,0.22,0.08,0.03,0.02]},"pool":[0.264,0.662,0.72,0.728,0.955,1.198,1.418,1.638,2.101,2.915,2.961,3.492,3.547,4.254,4.514,4.595,4.768,5.517,5.589,5.851,6.147,6.186,6.893,8.523,9.69,10.291,10.367,10.406,20.598,29.619,50.053,96.928],"poolN":32,"poolMean":10.106,"ypu":{"長袖シャツ・ブラウス":3629,"シアー・羽織りシャツ":3637,"半袖・袖なしシャツ・ブラウス":3607,"長袖カットソー":3051,"半袖・袖なしカットソー":3607,"キャミ・タンク":3530,"長袖ニット":3167,"カーディガン":4135,"サマーニット・ベスト":3607,"スウェット・パーカー":3607,"長袖ワンピース":3607,"半袖・袖なしワンピース":3607,"スカート":3607,"パンツ":4035,"アウター・ジャケット":3593,"コート":3607,"オールインワン・セットアップ":3607,"シューズ":3607},"presets":{"actual":{"長袖シャツ・ブラウス":{"12":0,"1":0,"2":4,"3":0,"4":1,"5":0},"シアー・羽織りシャツ":{"12":0,"1":0,"2":1,"3":0,"4":0,"5":0},"半袖・袖なしシャツ・ブラウス":{"12":0,"1":0,"2":0,"3":0,"4":0,"5":0},"長袖カットソー":{"12":0,"1":1,"2":2,"3":2,"4":0,"5":1},"半袖・袖なしカットソー":{"12":0,"1":0,"2":0,"3":0,"4":0,"5":0},"キャミ・タンク":{"12":0,"1":0,"2":0,"3":0,"4":0,"5":1},"長袖ニット":{"12":7,"1":4,"2":1,"3":0,"4":0,"5":0},"カーディガン":{"12":1,"1":0,"2":2,"3":0,"4":0,"5":0},"サマーニット・ベスト":{"12":0,"1":0,"2":0,"3":0,"4":0,"5":0},"スウェット・パーカー":{"12":0,"1":0,"2":0,"3":0,"4":0,"5":0},"長袖ワンピース":{"12":0,"1":0,"2":0,"3":0,"4":0,"5":0},"半袖・袖なしワンピース":{"12":0,"1":0,"2":0,"3":0,"4":0,"5":0},"スカート":{"12":0,"1":0,"2":0,"3":0,"4":0,"5":0},"パンツ":{"12":0,"1":0,"2":1,"3":1,"4":0,"5":1},"アウター・ジャケット":{"12":0,"1":0,"2":0,"3":1,"4":0,"5":0},"コート":{"12":0,"1":0,"2":0,"3":0,"4":0,"5":0},"オールインワン・セットアップ":{"12":0,"1":0,"2":0,"3":0,"4":0,"5":0},"シューズ":{"12":0,"1":0,"2":0,"3":0,"4":0,"5":0}},"calendar":{"長袖シャツ・ブラウス":{"12":2,"1":1,"2":0,"3":0,"4":0,"5":0},"シアー・羽織りシャツ":{"12":0,"1":0,"2":2,"3":0,"4":0,"5":0},"半袖・袖なしシャツ・ブラウス":{"12":0,"1":0,"2":2,"3":0,"4":0,"5":0},"長袖カットソー":{"12":0,"1":1,"2":1,"3":0,"4":0,"5":0},"半袖・袖なしカットソー":{"12":0,"1":0,"2":9,"3":0,"4":0,"5":0},"キャミ・タンク":{"12":0,"1":0,"2":2,"3":0,"4":1,"5":0},"長袖ニット":{"12":6,"1":5,"2":0,"3":0,"4":0,"5":0},"カーディガン":{"12":0,"1":3,"2":3,"3":0,"4":0,"5":0},"サマーニット・ベスト":{"12":0,"1":0,"2":0,"3":1,"4":1,"5":0},"スウェット・パーカー":{"12":0,"1":0,"2":0,"3":0,"4":0,"5":0},"長袖ワンピース":{"12":0,"1":0,"2":0,"3":0,"4":0,"5":0},"半袖・袖なしワンピース":{"12":0,"1":0,"2":0,"3":0,"4":0,"5":0},"スカート":{"12":0,"1":0,"2":0,"3":0,"4":0,"5":0},"パンツ":{"12":0,"1":0,"2":0,"3":6,"4":0,"5":0},"アウター・ジャケット":{"12":0,"1":1,"2":0,"3":0,"4":0,"5":0},"コート":{"12":0,"1":0,"2":0,"3":0,"4":0,"5":0},"オールインワン・セットアップ":{"12":0,"1":0,"2":0,"3":0,"4":0,"5":0},"シューズ":{"12":0,"1":0,"2":0,"3":0,"4":0,"5":0}},"guide":{"長袖シャツ・ブラウス":{"12":2,"1":1,"2":0,"3":0,"4":0,"5":0},"シアー・羽織りシャツ":{"12":0,"1":0,"2":2,"3":0,"4":0,"5":0},"半袖・袖なしシャツ・ブラウス":{"12":0,"1":0,"2":2,"3":0,"4":0,"5":0},"長袖カットソー":{"12":0,"1":1,"2":1,"3":0,"4":0,"5":0},"半袖・袖なしカットソー":{"12":0,"1":0,"2":10,"3":0,"4":0,"5":0},"キャミ・タンク":{"12":0,"1":0,"2":2,"3":0,"4":1,"5":0},"長袖ニット":{"12":6,"1":5,"2":0,"3":0,"4":0,"5":0},"カーディガン":{"12":0,"1":3,"2":3,"3":0,"4":0,"5":0},"サマーニット・ベスト":{"12":0,"1":0,"2":0,"3":1,"4":1,"5":0},"スウェット・パーカー":{"12":0,"1":0,"2":0,"3":0,"4":0,"5":0},"長袖ワンピース":{"12":0,"1":0,"2":0,"3":0,"4":0,"5":0},"半袖・袖なしワンピース":{"12":0,"1":0,"2":0,"3":0,"4":0,"5":0},"スカート":{"12":0,"1":0,"2":0,"3":0,"4":0,"5":0},"パンツ":{"12":0,"1":0,"2":0,"3":6,"4":0,"5":0},"アウター・ジャケット":{"12":0,"1":1,"2":0,"3":0,"4":0,"5":0},"コート":{"12":0,"1":0,"2":0,"3":0,"4":0,"5":0},"オールインワン・セットアップ":{"12":0,"1":0,"2":0,"3":0,"4":0,"5":0},"シューズ":{"12":0,"1":0,"2":0,"3":0,"4":0,"5":0}}},"calmark":{"長袖シャツ・ブラウス":{"12":1,"1":1,"2":0,"3":0,"4":0,"5":0},"シアー・羽織りシャツ":{"12":0,"1":0,"2":1,"3":0,"4":0,"5":0},"半袖・袖なしシャツ・ブラウス":{"12":0,"1":0,"2":1,"3":0,"4":0,"5":0},"長袖カットソー":{"12":0,"1":1,"2":1,"3":0,"4":0,"5":0},"半袖・袖なしカットソー":{"12":0,"1":0,"2":1,"3":0,"4":0,"5":0},"キャミ・タンク":{"12":0,"1":0,"2":1,"3":0,"4":1,"5":0},"長袖ニット":{"12":1,"1":1,"2":0,"3":0,"4":0,"5":0},"カーディガン":{"12":0,"1":1,"2":1,"3":0,"4":0,"5":0},"サマーニット・ベスト":{"12":0,"1":0,"2":0,"3":1,"4":1,"5":0},"スウェット・パーカー":{"12":0,"1":0,"2":0,"3":0,"4":0,"5":0},"長袖ワンピース":{"12":0,"1":0,"2":0,"3":0,"4":0,"5":0},"半袖・袖なしワンピース":{"12":0,"1":0,"2":0,"3":0,"4":0,"5":0},"スカート":{"12":0,"1":0,"2":0,"3":0,"4":0,"5":0},"パンツ":{"12":0,"1":0,"2":0,"3":1,"4":0,"5":0},"アウター・ジャケット":{"12":0,"1":1,"2":1,"3":0,"4":0,"5":0},"コート":{"12":0,"1":0,"2":0,"3":0,"4":0,"5":0},"オールインワン・セットアップ":{"12":0,"1":0,"2":0,"3":0,"4":0,"5":0},"シューズ":{"12":0,"1":0,"2":0,"3":0,"4":0,"5":0}},"aw":{"mult":0.64,"n25":10,"n26":5,"mean25":4.904139218554668,"mean26":3.1161315875108597},"arr":{"init":301.1,"add":179.6,"sold":197.0,"cost":1554.8,"price":4135.7,"n":47},"hits":[["50261208","クロップドストライプシャーリングシャツ",118.4,"2026-04","長袖シャツ・ブラウス"],["58254103","配色ステッチニットカーディガン",54.2,"2025-12","カーディガン"],["50254103","シアーチェックフードシャツ",34.5,"2026-02","シアー・羽織りシャツ"],["50261201","ロゴ刺繍ボーダーロンT",24.7,"2026-01","長袖カットソー"],["58254214","ロゴ刺繍レイヤードカーディガン",11.1,"2026-02","カーディガン"]]},{"key":"stella","name":"STELLA FISH","target":[1750000,1500000,2250000,2500000,2500000,2500000,3000000],"existing":[1833363,1008674,936482,398514,410735,420713,711381],"existingParts":{"継続（去年からの品番）":[0,0,0,0,0,0,0],"継続（今年の春夏に出した品番）":[528935,203989,338108,200507,366340,403985,700042],"今季の投入済み新作":[1304427,804685,598374,198007,44395,16729,11339]},"lastYear":[19912,5592,900,23708,686137,1234102,2259409],"total":[3662750,2957250,5914000,5571250,5319500,5854000,5430000],"malls":{"SHOPLIST":1149000,"ZOZO":16000000,"楽天":14820000,"YAHOO":180250,"楽天F":642500,"ジェイド":239000,"qoo10":243000,"TIKTOK":1435000},"zshare":[0.4778,0.5072,0.3805,0.4487,0.47,0.4271,0.5525],"ratio":0.05,"fac":{"ssNew":0.31,"ssOld":0.55,"coh":[1.33,0.82,0.61,0.2,0.04,0.02,0.01]},"pool":[0.553,0.558,0.559,1.101,1.105,1.803,2.779,3.156,3.632,5.069,5.226,5.245,10.194,12.062,24.931],"poolN":15,"poolMean":5.198,"ypu":{"長袖シャツ・ブラウス":2545,"シアー・羽織りシャツ":2628,"半袖・袖なしシャツ・ブラウス":2628,"長袖カットソー":2212,"半袖・袖なしカットソー":2529,"キャミ・タンク":2628,"長袖ニット":2628,"カーディガン":2628,"サマーニット・ベスト":2808,"スウェット・パーカー":2628,"長袖ワンピース":2720,"半袖・袖なしワンピース":2628,"スカート":2394,"パンツ":3197,"アウター・ジャケット":2628,"コート":2628,"オールインワン・セットアップ":2628,"シューズ":2628},"presets":{"actual":{"長袖シャツ・ブラウス":{"12":0,"1":0,"2":1,"3":1,"4":0,"5":0},"シアー・羽織りシャツ":{"12":0,"1":0,"2":0,"3":0,"4":0,"5":0},"半袖・袖なしシャツ・ブラウス":{"12":0,"1":0,"2":0,"3":0,"4":0,"5":0},"長袖カットソー":{"12":0,"1":0,"2":0,"3":0,"4":2,"5":0},"半袖・袖なしカットソー":{"12":0,"1":0,"2":0,"3":0,"4":0,"5":2},"キャミ・タンク":{"12":0,"1":0,"2":0,"3":0,"4":0,"5":0},"長袖ニット":{"12":0,"1":0,"2":0,"3":0,"4":0,"5":0},"カーディガン":{"12":0,"1":0,"2":0,"3":0,"4":0,"5":0},"サマーニット・ベスト":{"12":0,"1":0,"2":0,"3":0,"4":1,"5":0},"スウェット・パーカー":{"12":0,"1":0,"2":0,"3":0,"4":0,"5":0},"長袖ワンピース":{"12":0,"1":0,"2":0,"3":0,"4":1,"5":0},"半袖・袖なしワンピース":{"12":0,"1":0,"2":0,"3":0,"4":0,"5":0},"スカート":{"12":0,"1":0,"2":0,"3":0,"4":0,"5":1},"パンツ":{"12":0,"1":0,"2":0,"3":0,"4":2,"5":4},"アウター・ジャケット":{"12":0,"1":0,"2":0,"3":0,"4":0,"5":0},"コート":{"12":0,"1":0,"2":0,"3":0,"4":0,"5":0},"オールインワン・セットアップ":{"12":0,"1":0,"2":0,"3":0,"4":0,"5":0},"シューズ":{"12":0,"1":0,"2":0,"3":0,"4":0,"5":0}},"calendar":{"長袖シャツ・ブラウス":{"12":0,"1":0,"2":0,"3":0,"4":0,"5":0},"シアー・羽織りシャツ":{"12":0,"1":0,"2":0,"3":0,"4":0,"5":0},"半袖・袖なしシャツ・ブラウス":{"12":0,"1":0,"2":3,"3":0,"4":0,"5":0},"長袖カットソー":{"12":0,"1":0,"2":0,"3":0,"4":0,"5":0},"半袖・袖なしカットソー":{"12":0,"1":0,"2":8,"3":0,"4":2,"5":0},"キャミ・タンク":{"12":0,"1":0,"2":0,"3":0,"4":0,"5":0},"長袖ニット":{"12":0,"1":0,"2":0,"3":0,"4":0,"5":0},"カーディガン":{"12":0,"1":1,"2":1,"3":0,"4":0,"5":0},"サマーニット・ベスト":{"12":0,"1":0,"2":0,"3":1,"4":1,"5":0},"スウェット・パーカー":{"12":0,"1":0,"2":0,"3":0,"4":0,"5":0},"長袖ワンピース":{"12":0,"1":0,"2":0,"3":0,"4":0,"5":0},"半袖・袖なしワンピース":{"12":0,"1":0,"2":0,"3":2,"4":1,"5":0},"スカート":{"12":0,"1":1,"2":1,"3":0,"4":0,"5":0},"パンツ":{"12":0,"1":1,"2":0,"3":7,"4":0,"5":0},"アウター・ジャケット":{"12":0,"1":0,"2":0,"3":0,"4":0,"5":0},"コート":{"12":0,"1":0,"2":0,"3":0,"4":0,"5":0},"オールインワン・セットアップ":{"12":0,"1":0,"2":0,"3":0,"4":0,"5":0},"シューズ":{"12":0,"1":0,"2":0,"3":0,"4":0,"5":0}},"guide":{"長袖シャツ・ブラウス":{"12":0,"1":0,"2":0,"3":0,"4":0,"5":0},"シアー・羽織りシャツ":{"12":0,"1":0,"2":0,"3":0,"4":0,"5":0},"半袖・袖なしシャツ・ブラウス":{"12":0,"1":0,"2":5,"3":0,"4":0,"5":0},"長袖カットソー":{"12":0,"1":0,"2":0,"3":0,"4":0,"5":0},"半袖・袖なしカットソー":{"12":0,"1":0,"2":13,"3":0,"4":3,"5":0},"キャミ・タンク":{"12":0,"1":0,"2":0,"3":0,"4":0,"5":0},"長袖ニット":{"12":0,"1":0,"2":0,"3":0,"4":0,"5":0},"カーディガン":{"12":0,"1":2,"2":2,"3":0,"4":0,"5":0},"サマーニット・ベスト":{"12":0,"1":0,"2":0,"3":2,"4":2,"5":0},"スウェット・パーカー":{"12":0,"1":0,"2":0,"3":0,"4":0,"5":0},"長袖ワンピース":{"12":0,"1":0,"2":0,"3":0,"4":0,"5":0},"半袖・袖なしワンピース":{"12":0,"1":0,"2":0,"3":3,"4":2,"5":0},"スカート":{"12":0,"1":2,"2":2,"3":0,"4":0,"5":0},"パンツ":{"12":0,"1":2,"2":0,"3":12,"4":0,"5":0},"アウター・ジャケット":{"12":0,"1":0,"2":0,"3":0,"4":0,"5":0},"コート":{"12":0,"1":0,"2":0,"3":0,"4":0,"5":0},"オールインワン・セットアップ":{"12":0,"1":0,"2":0,"3":0,"4":0,"5":0},"シューズ":{"12":0,"1":0,"2":0,"3":0,"4":0,"5":0}}},"calmark":{"長袖シャツ・ブラウス":{"12":0,"1":0,"2":0,"3":0,"4":0,"5":0},"シアー・羽織りシャツ":{"12":0,"1":0,"2":0,"3":0,"4":0,"5":0},"半袖・袖なしシャツ・ブラウス":{"12":0,"1":0,"2":1,"3":0,"4":0,"5":0},"長袖カットソー":{"12":0,"1":0,"2":0,"3":0,"4":0,"5":0},"半袖・袖なしカットソー":{"12":0,"1":0,"2":1,"3":0,"4":1,"5":0},"キャミ・タンク":{"12":0,"1":0,"2":0,"3":0,"4":0,"5":0},"長袖ニット":{"12":0,"1":0,"2":0,"3":0,"4":0,"5":0},"カーディガン":{"12":0,"1":1,"2":1,"3":1,"4":0,"5":0},"サマーニット・ベスト":{"12":0,"1":0,"2":0,"3":1,"4":1,"5":0},"スウェット・パーカー":{"12":0,"1":0,"2":0,"3":0,"4":0,"5":0},"長袖ワンピース":{"12":0,"1":0,"2":0,"3":0,"4":0,"5":0},"半袖・袖なしワンピース":{"12":0,"1":0,"2":0,"3":1,"4":1,"5":0},"スカート":{"12":0,"1":1,"2":1,"3":1,"4":0,"5":0},"パンツ":{"12":0,"1":1,"2":1,"3":1,"4":0,"5":0},"アウター・ジャケット":{"12":0,"1":0,"2":0,"3":0,"4":0,"5":0},"コート":{"12":0,"1":0,"2":0,"3":0,"4":0,"5":0},"オールインワン・セットアップ":{"12":0,"1":0,"2":0,"3":0,"4":0,"5":0},"シューズ":{"12":0,"1":0,"2":0,"3":0,"4":0,"5":0}},"aw":{"mult":null,"n25":0,"n26":7,"mean25":NaN,"mean26":5.802898128279659},"arr":{"init":170.0,"add":139.1,"sold":95.0,"cost":1243.4,"price":3661.6,"n":43},"hits":[["10261118","サイドギャザーTシャツ",29.8,"2026-04","長袖カットソー"],["18261202","ニットベスト",14.0,"2026-04","サマーニット・ベスト"],["13261512","イージーカーヴィーパンツ",11.0,"2026-05","パンツ"],["10254236","サイドシャーリングシャツ",6.2,"2026-02","長袖シャツ・ブラウス"],["10261514","裾レースパンツ",4.8,"2026-04","パンツ"]]}]};
 const MONTH_LABEL = m => (+m.slice(5)) + "月";
-const LAUNCH = DATA.launch;                       // ["12","1","2","3","4","5"]
-const LIDX = {"12":-1,"1":0,"2":1,"3":2,"4":3,"5":4}; // 投入月 → 売上月の位置（売上月は1〜7月。12月に出す型は1月から数える）
-const TIERS = ["縦売り","中堅","その他"];
-const FY_END = 3;                                 // 0..3 が今期（1〜4月）
+const LAUNCH = DATA.launch, GROUPS = DATA.groups, NM = DATA.months.length;
+const FY_END = 3;
 const man = v => (Math.round(v/1e4)).toLocaleString("ja-JP");
 const yen = v => "¥" + man(v) + "万";
 const pct = v => (v*100).toFixed(0) + "%";
 const css = n => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
 const SERIES = LAUNCH.map((_,i) => "--s"+i);
+const R = 1000;
+const blank = () => { const o = {}; GROUPS.forEach(g => { o[g] = {}; LAUNCH.forEach(lm => o[g][lm] = 0); }); return o; };
+const clone = c => JSON.parse(JSON.stringify(c));
+// 季節の型（アイテムの中でいちばん多いもの）
+const SEASON = {}; GROUPS.forEach(g => { const t = {}; (DATA.mix[g] || []).forEach(([w, k, r]) => t[k] = (t[k] || 0) + r); SEASON[g] = Object.keys(t).sort((a,b) => t[b] - t[a])[0] || ""; });
 
-const state = {b:0, n:{}, mult:{}, focus:null, saved:{}};
-DATA.brands.forEach((b,i) => { state.n[i] = {...b.presets.guide}; state.mult[i] = 1; });
-state.scope = "zozo";
-try { const s = JSON.parse(localStorage.getItem("katasu-sim-2027")||"null"); if (s && s.n) { Object.assign(state.n, s.n); Object.assign(state.mult, s.mult||{}); state.b = s.b||0; if (s.scope) state.scope = s.scope; } } catch(e){}
-const remember = () => { try { localStorage.setItem("katasu-sim-2027", JSON.stringify({b:state.b, n:state.n, mult:state.mult, scope:state.scope})); } catch(e){} };
+const state = {b:0, cells:{}, level:{}, scope:"zozo", focus:null, saved:{}};
+DATA.brands.forEach((b,i) => { state.cells[i] = clone(b.presets.guide); state.level[i] = 1; });
+try { const s = JSON.parse(localStorage.getItem("katasu-sim-2027-v2")||"null"); if (s && s.cells) { Object.assign(state.cells, s.cells); Object.assign(state.level, s.level||{}); state.b = s.b||0; if (s.scope) state.scope = s.scope; } } catch(e){}
+DATA.brands.forEach((b,i) => { const c = state.cells[i] || {}; const o = blank(); GROUPS.forEach(g => LAUNCH.forEach(lm => o[g][lm] = Math.max(0, +((c[g] || {})[lm]) || 0))); state.cells[i] = o; if (!(state.level[i] > 0)) state.level[i] = 1; });
+const remember = () => { try { localStorage.setItem("katasu-sim-2027-v2", JSON.stringify({b:state.b, cells:state.cells, level:state.level, scope:state.scope})); } catch(e){} };
 
-// 表示用のブランド：全モールのときは目標を全モールの予算に、既存品を「÷ 予算の ZOZO の割合」で全体に広げる
 const ALL = () => state.scope === "all";
 const SC = (bi, m) => ALL() ? 1 / DATA.brands[bi].zshare[m] : 1;
 function VB(bi){ const b = DATA.brands[bi]; if (!ALL()) return b;
   const ex = {}; Object.keys(b.existingParts).forEach(k => ex[k] = b.existingParts[k].map((v,m) => v * SC(bi,m)));
   return {...b, target: b.total, existing: b.existing.map((v,m) => v * SC(bi,m)), existingParts: ex}; }
-// 当たりの倍率を掛けた区分の割合
-function probs(pr, mult){ let tv = pr.p["縦売り"]*mult, cv = pr.p["中堅"]*mult;
-  if (tv + cv > 1) { const s = tv + cv; tv /= s; cv /= s; }
-  return {縦売り:tv, 中堅:cv, その他:Math.max(0, 1 - tv - cv)}; }
-function compute(bi){
-  const b = VB(bi), n = state.n[bi], mult = state.mult[bi], M = DATA.months.length;
-  const contrib = LAUNCH.map(() => new Array(M).fill(0));
-  const tierN = {縦売り:0,中堅:0,その他:0}, tierAmt = {縦売り:0,中堅:0,その他:0}, tierAmtFY = {縦売り:0,中堅:0,その他:0};
-  LAUNCH.forEach((lm, li) => {
-    const cnt = +n[lm] || 0; if (!cnt) return;
-    const pr = b.profiles[li === 0 ? "秋冬" : "春夏"];
-    let tv = pr.p["縦売り"]*mult, cv = pr.p["中堅"]*mult;
-    if (tv + cv > 1) { const s = tv + cv; tv /= s; cv /= s; }
-    const p = {縦売り:tv, 中堅:cv, その他:Math.max(0, 1 - tv - cv)};
-    TIERS.forEach(t => tierN[t] += cnt * p[t]);
-    for (let m = Math.max(0, LIDX[lm]); m < M; m++) {   // 1型の月の売上＝季節（波動）×発売からの経過（b.curves：区分ごと）
-      TIERS.forEach(t => { const v = (b.curves[lm][t][m] || 0) * p[t] * cnt * SC(bi, m); contrib[li][m] += v; tierAmt[t] += v; if (m <= FY_END) tierAmtFY[t] += v; });
-    }
-  });
+// 1型（強さ1）の月の売上（円）と枚数
+const cellYen = (bi, g, lm) => DATA.units[g][lm].map((u,m) => u * DATA.gf[g] * DATA.brands[bi].ypu[g] * SC(bi,m));
+const cellUnits = (g, lm) => DATA.units[g][lm].map(u => u * DATA.gf[g]);
+function mulberry(a){ return () => { a |= 0; a = a + 0x6D2B79F5 | 0; let t = Math.imul(a ^ a >>> 15, 1 | a); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; }; }
+const q = (arr, p) => { const s = Float64Array.from(arr).sort(); const i = (s.length - 1) * p, lo = Math.floor(i), hi = Math.ceil(i); return s[lo] + (s[hi] - s[lo]) * (i - lo); };
+
+// 平均だけ（速い）
+function meanCalc(bi, cells, level){
+  const b = DATA.brands[bi], mu = b.poolMean * level, newM = new Array(NM).fill(0);
+  GROUPS.forEach(g => LAUNCH.forEach(lm => { const n = cells[g][lm]; if (!n) return; const V = cellYen(bi, g, lm); for (let m = 0; m < NM; m++) newM[m] += n * mu * V[m]; }));
+  return newM;
+}
+// 1,000回引く
+function simulate(bi, cells, level, runs){
+  const b = VB(bi), B = DATA.brands[bi], pool = B.pool, P = pool.length, rnd = mulberry(20270101 + bi);
+  const list = []; GROUPS.forEach(g => LAUNCH.forEach(lm => { const n = cells[g][lm]; if (n) list.push({g, lm, n, V: cellYen(bi, g, lm), U: cellUnits(g, lm)}); }));
+  const contrib = LAUNCH.map(() => new Array(NM).fill(0)), gsum = {}, mu = B.poolMean * level;
+  let units = 0;
+  list.forEach(c => { const li = LAUNCH.indexOf(c.lm); gsum[c.g] = gsum[c.g] || {n:0, fy:0, all:0};
+    gsum[c.g].n += c.n; for (let m = 0; m < NM; m++) { const v = c.n * mu * c.V[m]; contrib[li][m] += v; gsum[c.g].all += v; if (m <= FY_END) gsum[c.g].fy += v; units += c.n * mu * c.U[m]; } });
   const newM = DATA.months.map((_,m) => contrib.reduce((a,r) => a + r[m], 0));
-  const total = newM.map((v,m) => v + b.existing[m]);
+  const tot = newM.map((v,m) => v + b.existing[m]);
+  const draws = []; const fyT = [], allT = [];
+  const exFY = b.existing.slice(0, FY_END+1).reduce((a,v)=>a+v,0), exAll = b.existing.reduce((a,v)=>a+v,0);
+  for (let r = 0; r < runs; r++) {
+    const nm = new Float64Array(NM);
+    for (const c of list) { let S = 0; for (let j = 0; j < c.n; j++) S += pool[(rnd() * P) | 0]; S *= level; for (let m = 0; m < NM; m++) nm[m] += S * c.V[m]; }
+    draws.push(nm); let f = 0, a = 0; for (let m = 0; m < NM; m++) { a += nm[m]; if (m <= FY_END) f += nm[m]; } fyT.push(exFY + f); allT.push(exAll + a);
+  }
+  const lo = [], hi = [];
+  for (let m = 0; m < NM; m++) { const col = draws.map(d => d[m] + b.existing[m]); lo.push(q(col, .1)); hi.push(q(col, .9)); }
+  const tFY = b.target.slice(0, FY_END+1).reduce((a,v)=>a+v,0), tAll = b.target.reduce((a,v)=>a+v,0);
   const sum = (arr, a, z) => arr.slice(a, z+1).reduce((x,y) => x + y, 0);
-  return {contrib, newM, total, tierN, tierAmt, tierAmtFY,
-          fy: sum(total,0,FY_END) / sum(b.target,0,FY_END), all: sum(total,0,M-1) / sum(b.target,0,M-1),
-          newAll: sum(newM,0,M-1), gapAll: sum(b.target,0,M-1) - sum(b.existing,0,M-1)};
+  return {contrib, newM, total: tot, lo, hi, gsum, units, types: list.reduce((a,c)=>a+c.n,0),
+    fy: sum(tot,0,FY_END) / tFY, all: sum(tot,0,NM-1) / tAll, pFY: fyT.filter(v => v >= tFY).length / runs, pAll: allT.filter(v => v >= tAll).length / runs,
+    newAll: sum(newM,0,NM-1), newLo: q(allT,.1) - exAll, newHi: q(allT,.9) - exAll, gapAll: Math.max(0, tAll - exAll), fyLo: q(fyT,.1), fyHi: q(fyT,.9), allLo: q(allT,.1), allHi: q(allT,.9), tFY, tAll};
 }
 const grade = r => r >= 1 ? ["ok","届く"] : r >= 0.85 ? ["mid","あと少し"] : ["ng","足りない"];
 
 function renderTabs(){
   const el = document.getElementById("tabs"); el.innerHTML = "";
-  DATA.brands.forEach((b,i) => {
-    const t = document.createElement("button"); t.type="button"; t.className="tab"; t.role="tab"; t.id="tab-"+b.key;
+  DATA.brands.forEach((b,i) => { const t = document.createElement("button"); t.type="button"; t.className="tab"; t.role="tab"; t.id="tab-"+b.key;
     t.textContent = b.name; t.setAttribute("aria-selected", i===state.b);
-    t.onclick = () => { state.b = i; state.focus = null; remember(); renderAll(); };
-    el.appendChild(t);
-  });
+    t.onclick = () => { state.b = i; state.focus = null; remember(); renderAll(); }; el.appendChild(t); });
 }
-function renderRows(){
-  const b = DATA.brands[state.b], n = state.n[state.b];
-  const el = document.getElementById("rows"); el.innerHTML = "";
-  LAUNCH.forEach((lm, li) => {
-    const r = document.createElement("div"); r.className = "lrow";
-    const items = (b.items[lm] || []).slice(0,3).map(x => x[0]).join("・");
-    r.innerHTML = `<span class="sw" style="background:var(${SERIES[li]})"></span><span class="lab">${lm}月に出す</span>
-      <span class="stepper"><button class="step" type="button" aria-label="${lm}月を5型減らす" data-d="-5">−5</button><button class="step" type="button" aria-label="${lm}月を1型減らす" data-d="-1">−</button>
-      <input id="n-${lm}" type="number" min="0" max="999" inputmode="numeric" value="${n[lm]||0}" aria-label="${lm}月に出す型数"><button class="step" type="button" aria-label="${lm}月を1型増やす" data-d="1">＋</button><button class="step" type="button" aria-label="${lm}月を5型増やす" data-d="5">＋5</button></span>
-      <span class="lhint">${items ? "カレンダー：" + items + ((b.items[lm]||[]).length > 3 ? " ほか" : "") : (lm === "5" ? "カレンダー外（夏物の追加・実需フォロー）" : "カレンダー：該当なし")}</span>`;
-    const inp = r.querySelector("input");
-    inp.addEventListener("input", () => { n[lm] = Math.max(0, Math.min(999, parseInt(inp.value || "0", 10) || 0)); remember(); renderCalc(); });
-    r.querySelectorAll(".step").forEach(btn => btn.addEventListener("click", () => { n[lm] = Math.max(0, Math.min(999, (n[lm]||0) + (+btn.dataset.d))); inp.value = n[lm]; remember(); renderCalc(); }));
-    el.appendChild(r);
+function renderScope(){
+  const b = DATA.brands[state.b];
+  document.querySelectorAll("[data-scope]").forEach(x => x.setAttribute("aria-pressed", x.dataset.scope === state.scope));
+  const tz = b.target.reduce((a,v)=>a+v,0), tt = b.total.reduce((a,v)=>a+v,0);
+  document.getElementById("scopenote").textContent = ALL()
+    ? `全モールの予算で見ています（${b.name} の1〜7月 ${yen(tt)}、うち ZOZO ${yen(tz)}＝${Math.round(tz/tt*100)}%）。売上は ZOZO の見込みを ZOZO の割合で割って全体にしています。`
+    : `ZOZO の予算と ZOZO の売上（本店＋Yahoo 店）で見ています（${b.name} の1〜7月 ${yen(tz)}）。`;
+}
+function renderInputs(){
+  const b = DATA.brands[state.b], cells = state.cells[state.b], cal = b.calmark;
+  let h = `<thead><tr><th>アイテム</th>${LAUNCH.map(lm => `<th><span class="sw" style="background:var(${SERIES[LAUNCH.indexOf(lm)]});margin-right:4px"></span>${lm}月</th>`).join("")}<th>計</th></tr></thead><tbody>`;
+  GROUPS.forEach(g => {
+    const rt = LAUNCH.reduce((a,lm) => a + (cells[g][lm]||0), 0);
+    h += `<tr><td>${g}<span class="tag">${SEASON[g]}</span></td>` + LAUNCH.map(lm => { const v = cells[g][lm]||0;
+      return `<td class="${cal[g][lm] ? "cal" : ""}"><input type="number" min="0" max="999" inputmode="numeric" data-g="${g}" data-lm="${lm}" value="${v}" class="${v ? "" : "z"}" aria-label="${g} ${lm}月の型数"></td>`; }).join("") + `<td class="num" data-rt="${g}">${rt}</td></tr>`;
   });
-  const m = document.getElementById("mult"); m.value = state.mult[state.b];
+  h += `</tbody><tfoot><tr><td>計</td>${LAUNCH.map(lm => `<td class="num" data-ct="${lm}"></td>`).join("")}<td class="num" id="ntotal"></td></tr></tfoot>`;
+  const t = document.getElementById("intable"); t.innerHTML = h;
+  t.querySelectorAll("input").forEach(inp => inp.addEventListener("input", () => {
+    const v = Math.max(0, Math.min(999, parseInt(inp.value || "0", 10) || 0)); cells[inp.dataset.g][inp.dataset.lm] = v; inp.classList.toggle("z", !v);
+    t.querySelector(`[data-rt="${CSS.escape(inp.dataset.g)}"]`).textContent = LAUNCH.reduce((a,lm) => a + (cells[inp.dataset.g][lm]||0), 0);
+    document.getElementById("presetnote").textContent = ""; remember(); renderCalc(); }));
+  document.getElementById("level").value = state.level[state.b];
+}
+function renderTotals(){
+  const cells = state.cells[state.b];
+  LAUNCH.forEach(lm => { const el = document.querySelector(`[data-ct="${lm}"]`); if (el) el.textContent = GROUPS.reduce((a,g) => a + (cells[g][lm]||0), 0); });
+  document.getElementById("ntotal").textContent = GROUPS.reduce((a,g) => a + LAUNCH.reduce((x,lm) => x + (cells[g][lm]||0), 0), 0) + "型";
 }
 function renderKpis(c){
-  const b = VB(state.b);
-  const [g1,l1] = grade(c.fy), [g2,l2] = grade(c.all);
-  const k = document.getElementById("kpis");
-  k.innerHTML = `
-   <div class="kpi"><div class="k">今期（1〜4月）の${ALL() ? "全モールの" : "ZOZO の"}目標に対して</div><div class="v num ${g1}">${pct(c.fy)}<span class="pill">${l1}</span></div><div class="s">目標 ${yen(b.target.slice(0,FY_END+1).reduce((a,v)=>a+v,0))}</div></div>
-   <div class="kpi"><div class="k">1〜7月の${ALL() ? "全モールの" : "ZOZO の"}目標に対して</div><div class="v num ${g2}">${pct(c.all)}<span class="pill">${l2}</span></div><div class="s">新作の売上 ${yen(c.newAll)} ／ 新作で必要 ${yen(c.gapAll)}</div></div>
-   <div class="kpi"><div class="k">縦売りの見込み（1〜7月）</div><div class="v num">${c.tierN["縦売り"].toFixed(1)}<span style="font-size:14px;font-weight:500">型</span></div><div class="s">売上 ${yen(c.tierAmt["縦売り"])}（90日100万円以上）</div></div>
-   <div class="kpi"><div class="k">中堅の見込み（1〜7月）</div><div class="v num">${c.tierN["中堅"].toFixed(1)}<span style="font-size:14px;font-weight:500">型</span></div><div class="s">売上 ${yen(c.tierAmt["中堅"])}・その他 ${c.tierN["その他"].toFixed(0)}型 ${yen(c.tierAmt["その他"])}</div></div>`;
+  const b = VB(state.b), L = state.level[state.b];
+  const [g1,l1] = grade(c.fy), [g2,l2] = grade(c.all), P = v => Math.round(v * 100) + "%";
+  document.getElementById("kpis").innerHTML = `
+   <div class="kpi"><div class="k">今期（1〜4月）の${ALL() ? "全モールの" : "ZOZO の"}目標に対して（平均）</div><div class="v num ${g1}">${pct(c.fy)}<span class="pill">${l1}</span></div><div class="s">届く確率 <b>${P(c.pFY)}</b>・目標 ${yen(c.tFY)}</div></div>
+   <div class="kpi"><div class="k">1〜7月の${ALL() ? "全モールの" : "ZOZO の"}目標に対して（平均）</div><div class="v num ${g2}">${pct(c.all)}<span class="pill">${l2}</span></div><div class="s">届く確率 <b>${P(c.pAll)}</b>・目標 ${yen(c.tAll)}</div></div>
+   <div class="kpi"><div class="k">新作の売上（1〜7月）</div><div class="v num">${yen(c.newAll)}</div><div class="s">幅 ${yen(Math.max(0,c.newLo))}〜${yen(c.newHi)} ／ 新作で必要 ${yen(c.gapAll)}</div></div>
+   <div class="kpi"><div class="k">型数・強さ</div><div class="v num">${c.types}<span style="font-size:14px;font-weight:500">型</span></div><div class="s">強さ ×${L.toFixed(2)}（去年の春夏＝1）</div></div>`;
 }
 function niceMax(v){ const e = Math.pow(10, Math.floor(Math.log10(v))); const f = v / e; return (f <= 1 ? 1 : f <= 2 ? 2 : f <= 2.5 ? 2.5 : f <= 5 ? 5 : 10) * e; }
 function renderChart(c){
   const b = VB(state.b), svg = document.getElementById("chart");
-  const W = 760, H = 380, ml = 58, mr = 12, mt = 26, mb = 40, M = DATA.months.length;
-  const vmax = niceMax(Math.max(...b.target, ...c.total) * 1.08);
-  const x0 = i => ml + (W - ml - mr) / M * i, bw = (W - ml - mr) / M * 0.62, off = (W - ml - mr) / M * 0.19;
+  const W = 760, H = 390, ml = 58, mr = 12, mt = 26, mb = 40, M = NM;
+  const vmax = niceMax(Math.max(...b.target, ...c.hi, ...c.total) * 1.05);
+  const x0 = i => ml + (W - ml - mr) / M * i, bw = (W - ml - mr) / M * 0.56, off = (W - ml - mr) / M * 0.22;
   const y = v => mt + (H - mt - mb) * (1 - v / vmax);
-  const ink3 = css("--ink-3"), line = css("--line"), ink2 = css("--ink-2");
+  const ink3 = css("--ink-3"), line = css("--line"), ink2 = css("--ink-2"), band = css("--band");
   let s = "";
   for (let i = 0; i <= 5; i++) { const v = vmax / 5 * i, yy = y(v);
-    s += `<line x1="${ml}" x2="${W-mr}" y1="${yy}" y2="${yy}" stroke="${line}" stroke-width="1"/>`;
-    s += `<text x="${ml-8}" y="${yy+4}" text-anchor="end" font-size="11" fill="${ink3}" font-family="var(--mono)">${man(v)}万</text>`; }
+    s += `<line x1="${ml}" x2="${W-mr}" y1="${yy}" y2="${yy}" stroke="${line}" stroke-width="1"/><text x="${ml-8}" y="${yy+4}" text-anchor="end" font-size="11" fill="${ink3}" font-family="var(--mono)">${man(v)}万</text>`; }
   const fx = x0(FY_END + 1) - 2;
   s += `<line x1="${fx}" x2="${fx}" y1="${mt-14}" y2="${H-mb}" stroke="${css("--line-2")}" stroke-dasharray="4 4"/>`;
   s += `<text x="${fx-6}" y="${mt-6}" text-anchor="end" font-size="11" fill="${ink2}">← 今期（4月決算）</text><text x="${fx+6}" y="${mt-6}" font-size="11" fill="${ink2}">来期（5〜7月）→</text>`;
@@ -385,11 +381,13 @@ function renderChart(c){
       return `<rect class="bar" x="${bx}" y="${y1}" width="${bw}" height="${Math.max(0, h - 1.5)}" rx="2" fill="${color}" opacity="${dim}"/>`; };
     s += seg(b.existing[i], css("--exist"), "exist");
     LAUNCH.forEach((lm, li) => { s += seg(c.contrib[li][i], css(SERIES[li]), li); });
+    const cx = bx + bw + 7, yl = y(c.lo[i]), yh = y(c.hi[i]);
+    s += `<line x1="${cx}" x2="${cx}" y1="${yh}" y2="${yl}" stroke="${band}" stroke-width="1.5" opacity=".7"/><line x1="${cx-3}" x2="${cx+3}" y1="${yh}" y2="${yh}" stroke="${band}" stroke-width="1.5" opacity=".7"/><line x1="${cx-3}" x2="${cx+3}" y1="${yl}" y2="${yl}" stroke="${band}" stroke-width="1.5" opacity=".7"/>`;
     const ty = y(b.target[i]);
     s += `<line x1="${bx-6}" x2="${bx+bw+6}" y1="${ty}" y2="${ty}" stroke="${css("--target")}" stroke-width="2.5"/>`;
     s += `<text x="${bx+bw/2}" y="${H-mb+18}" text-anchor="middle" font-size="12" fill="${ink2}">${MONTH_LABEL(m)}</text>`;
     const r = c.total[i] / b.target[i];
-    s += `<text x="${bx+bw/2}" y="${Math.min(ty, y(c.total[i])) - 6}" text-anchor="middle" font-size="11" font-family="var(--mono)" fill="${r >= 1 ? css("--good") : ink2}">${pct(r)}</text>`;
+    s += `<text x="${bx+bw/2}" y="${Math.min(ty, y(c.total[i]), yh) - 6}" text-anchor="middle" font-size="11" font-family="var(--mono)" fill="${r >= 1 ? css("--good") : ink2}">${pct(r)}</text>`;
     s += `<rect x="${x0(i)}" y="${mt}" width="${(W-ml-mr)/M}" height="${H-mt-mb}" fill="transparent" data-i="${i}" class="hit"/>`;
   });
   svg.innerHTML = s;
@@ -397,175 +395,161 @@ function renderChart(c){
   svg.querySelectorAll(".hit").forEach(h => {
     const show = ev => { const i = +h.dataset.i, m = DATA.months[i];
       let rows = `<tr><td><b>${MONTH_LABEL(m)}</b></td><td class="r">万円</td></tr><tr><td>既存品</td><td class="r">${man(b.existing[i])}</td></tr>`;
-      LAUNCH.forEach((lm, li) => { if (c.contrib[li][i] > 0) rows += `<tr><td><span class="sw" style="display:inline-block;background:var(${SERIES[li]});margin-right:5px"></span>${lm}月に出した型</td><td class="r">${man(c.contrib[li][i])}</td></tr>`; });
-      rows += `<tr><td><b>合計</b></td><td class="r"><b>${man(c.total[i])}</b></td></tr><tr><td>目標</td><td class="r">${man(b.target[i])}</td></tr><tr><td>差</td><td class="r">${(c.total[i]-b.target[i] >= 0 ? "+" : "") + man(c.total[i]-b.target[i])}</td></tr>`;
+      LAUNCH.forEach((lm, li) => { if (c.contrib[li][i] > 0) rows += `<tr><td><span class="sw" style="background:var(${SERIES[li]});margin-right:5px"></span>${lm}月に出した型</td><td class="r">${man(c.contrib[li][i])}</td></tr>`; });
+      rows += `<tr><td><b>合計（平均）</b></td><td class="r"><b>${man(c.total[i])}</b></td></tr><tr><td>幅（10〜90%）</td><td class="r">${man(c.lo[i])}〜${man(c.hi[i])}</td></tr><tr><td>目標</td><td class="r">${man(b.target[i])}</td></tr>`;
       tip.innerHTML = `<table>${rows}</table>`; tip.hidden = false;
       const rc = wrap.getBoundingClientRect(), px = (ev.clientX || rc.left + rc.width/2) - rc.left;
-      tip.style.left = Math.max(4, Math.min(rc.width - 200, px + 12)) + "px"; tip.style.top = "8px"; };
-    h.addEventListener("mousemove", show); h.addEventListener("click", show);
-    h.addEventListener("mouseleave", () => tip.hidden = true);
+      tip.style.left = Math.max(4, Math.min(rc.width - 210, px + 12)) + "px"; tip.style.top = "8px"; };
+    h.addEventListener("mousemove", show); h.addEventListener("click", show); h.addEventListener("mouseleave", () => tip.hidden = true);
   });
+  const cells = state.cells[state.b];
   const lg = document.getElementById("legend");
-  lg.innerHTML = `<span><span class="sw" style="display:inline-block;background:var(--exist);margin-right:5px;vertical-align:-1px"></span>既存品</span>` +
-    LAUNCH.map((lm, li) => `<button type="button" data-li="${li}" aria-pressed="${state.focus === li}"><span class="sw" style="background:var(${SERIES[li]})"></span>${lm}月に出す型（${state.n[state.b][lm]||0}型）</button>`).join("") +
+  lg.innerHTML = `<span><span class="sw" style="background:var(--exist);margin-right:5px"></span>既存品</span>` +
+    LAUNCH.map((lm, li) => `<button type="button" data-li="${li}" aria-pressed="${state.focus === li}"><span class="sw" style="background:var(${SERIES[li]})"></span>${lm}月に出す型（${GROUPS.reduce((a,g)=>a+(cells[g][lm]||0),0)}型）</button>`).join("") +
     `<span><span style="display:inline-block;width:16px;border-top:2.5px solid var(--target);vertical-align:3px;margin-right:5px"></span>目標</span>`;
   lg.querySelectorAll("button").forEach(bt => bt.onclick = () => { const li = +bt.dataset.li; state.focus = state.focus === li ? null : li; renderCalc(); });
 }
 function renderTable(c){
-  const b = VB(state.b), M = DATA.months.length, n = state.n[state.b];
-  const mx = Math.max(1, ...c.contrib.flat());
+  const b = VB(state.b), cells = state.cells[state.b], mx = Math.max(1, ...c.contrib.flat());
+  const S = (a, z, arr) => arr.slice(a, z+1).reduce((x,v)=>x+v,0);
   let h = `<thead><tr><th>投入月</th><th>型数</th>${DATA.months.map((m,i) => `<th class="${i===FY_END+1?'fy':''}">${MONTH_LABEL(m)}</th>`).join("")}<th>1〜4月</th><th>1〜7月</th></tr></thead><tbody>`;
-  LAUNCH.forEach((lm, li) => {
-    const row = c.contrib[li], fy = row.slice(0,FY_END+1).reduce((a,v)=>a+v,0), al = row.reduce((a,v)=>a+v,0);
-    h += `<tr data-li="${li}" class="${state.focus===li?'sel':''}"><td><span class="sw" style="display:inline-block;background:var(${SERIES[li]});margin-right:6px;vertical-align:-1px"></span>${lm}月に出す</td><td class="num">${n[lm]||0}</td>` +
-      row.map((v,i) => `<td class="num ${i===FY_END+1?'fy':''}"><span class="cell" style="padding:1px 6px;background:color-mix(in srgb, var(${SERIES[li]}) ${Math.round(v/mx*55)}%, transparent)">${v>0?man(v):"–"}</span></td>`).join("") +
-      `<td class="num">${man(fy)}</td><td class="num">${man(al)}</td></tr>`;
-  });
-  const sumr = (arr) => `${arr.map((v,i) => `<td class="num ${i===FY_END+1?'fy':''}">${man(v)}</td>`).join("")}<td class="num">${man(arr.slice(0,FY_END+1).reduce((a,v)=>a+v,0))}</td><td class="num">${man(arr.reduce((a,v)=>a+v,0))}</td>`;
-  const diff = c.total.map((v,i) => v - b.target[i]);
-  h += `</tbody><tfoot><tr><td>新作 計</td><td class="num">${LAUNCH.reduce((a,lm)=>a+(+n[lm]||0),0)}</td>${sumr(c.newM)}</tr>
-    <tr><td>既存品</td><td></td>${sumr(b.existing)}</tr><tr><td>合計</td><td></td>${sumr(c.total)}</tr><tr><td>目標</td><td></td>${sumr(b.target)}</tr>
-    <tr><td>差（合計−目標）</td><td></td>${diff.map((v,i) => `<td class="num ${v>=0?'ok':'ng'} ${i===FY_END+1?'fy':''}">${(v>=0?"+":"")+man(v)}</td>`).join("")}<td class="num">${man(diff.slice(0,FY_END+1).reduce((a,v)=>a+v,0))}</td><td class="num">${man(diff.reduce((a,v)=>a+v,0))}</td></tr></tfoot>`;
-  const t = document.getElementById("cotable"); t.innerHTML = h;
-  t.querySelectorAll("tbody tr").forEach(tr => tr.onclick = () => { const li = +tr.dataset.li; state.focus = state.focus === li ? null : li; renderCalc(); });
+  h += `<tr><td>既存品</td><td></td>${b.existing.map((v,i) => `<td class="num ${i===FY_END+1?'fy':''}">${man(v)}</td>`).join("")}<td class="num">${man(S(0,FY_END,b.existing))}</td><td class="num">${man(S(0,NM-1,b.existing))}</td></tr>`;
+  LAUNCH.forEach((lm, li) => { const row = c.contrib[li], n = GROUPS.reduce((a,g)=>a+(cells[g][lm]||0),0);
+    h += `<tr><td><span class="sw" style="background:var(${SERIES[li]});margin-right:6px"></span>${lm}月に出す</td><td class="num">${n}</td>` +
+      row.map((v,i) => `<td class="num ${i===FY_END+1?'fy':''}"><span class="cell" style="background:color-mix(in srgb, var(${SERIES[li]}) ${Math.round(v/mx*55)}%, transparent)">${v>0?man(v):"–"}</span></td>`).join("") +
+      `<td class="num">${man(S(0,FY_END,row))}</td><td class="num">${man(S(0,NM-1,row))}</td></tr>`; });
+  h += `</tbody><tfoot><tr><td>合計（平均）</td><td class="num">${c.types}</td>${c.total.map((v,i) => `<td class="num ${i===FY_END+1?'fy':''}">${man(v)}</td>`).join("")}<td class="num">${man(S(0,FY_END,c.total))}</td><td class="num">${man(S(0,NM-1,c.total))}</td></tr>
+    <tr class="band"><td>合計の幅・下から10%</td><td></td>${c.lo.map((v,i) => `<td class="num ${i===FY_END+1?'fy':''}">${man(v)}</td>`).join("")}<td class="num">${man(c.fyLo)}</td><td class="num">${man(c.allLo)}</td></tr>
+    <tr class="band"><td>合計の幅・下から90%</td><td></td>${c.hi.map((v,i) => `<td class="num ${i===FY_END+1?'fy':''}">${man(v)}</td>`).join("")}<td class="num">${man(c.fyHi)}</td><td class="num">${man(c.allHi)}</td></tr>
+    <tr><td>目標</td><td></td>${b.target.map((v,i) => `<td class="num ${i===FY_END+1?'fy':''}">${man(v)}</td>`).join("")}<td class="num">${man(c.tFY)}</td><td class="num">${man(c.tAll)}</td></tr></tfoot>`;
+  document.getElementById("cotable").innerHTML = h;
 }
-function renderItems(){
-  const b = DATA.brands[state.b], el = document.getElementById("items");
-  el.innerHTML = LAUNCH.filter(lm => (b.items[lm]||[]).length).map(lm => `<div class="itm"><h3><span class="sw" style="background:var(${SERIES[LAUNCH.indexOf(lm)]})"></span>${lm}月に出す</h3><div class="chips">${b.items[lm].map(x => `<span class="chip">${x[0]}（${x[1]}）${x[2] ? `<span class="span" title="${x[3] || ""}">${x[2]}</span>` : ""}</span>`).join("")}</div></div>`).join("") || `<p class="note">カレンダーに該当するアイテムがありません。</p>`;
+function renderGroups(c){
+  const rows = GROUPS.filter(g => c.gsum[g]).sort((a,b) => c.gsum[b].all - c.gsum[a].all);
+  let h = `<thead><tr><th>アイテム</th><th>季節の型</th><th>型数</th><th>1〜4月</th><th>1〜7月</th><th>1型あたり 1〜7月</th><th>新作の中の割合</th></tr></thead><tbody>`;
+  rows.forEach(g => { const x = c.gsum[g];
+    h += `<tr><td>${g}</td><td>${SEASON[g]}</td><td class="num">${x.n}</td><td class="num">${man(x.fy)}</td><td class="num">${man(x.all)}</td><td class="num">${(x.all/x.n/1e4).toFixed(1)}</td><td class="num">${c.newAll ? pct(x.all / c.newAll) : "–"}</td></tr>`; });
+  document.getElementById("gtable").innerHTML = h + (rows.length ? "" : `<tr><td colspan="7">型数を入れると出ます。</td></tr>`) + "</tbody>";
 }
-function renderTiers(){
-  const b = DATA.brands[state.b], m = state.mult[state.b];
-  let h = `<thead><tr><th>季節</th><th>新作の型数（去年）</th>${TIERS.map(t => `<th>${t}の割合</th>`).join("")}${TIERS.map(t => `<th>${t} 90日の平均</th>`).join("")}</tr></thead><tbody>`;
-  ["秋冬","春夏"].forEach(se => { const p = b.profiles[se];
-    h += `<tr><td>${se}${se==="秋冬"?"（12月に出す型）":"（1〜5月に出す型）"}</td><td class="num">${p.n}</td>${TIERS.map(t => `<td class="num">${(p.p[t]*100).toFixed(1)}%</td>`).join("")}${TIERS.map(t => `<td class="num">${p.avg90[t] ? yen(p.avg90[t]) : "–"}</td>`).join("")}</tr>`; });
-  document.getElementById("tiertable").innerHTML = h + "</tbody>";
-  document.getElementById("hits").textContent = b.hits.length ? "去年の縦売りの例：" + b.hits.map(x => `${x[1]}（${x[0]}・90日 ${yen(x[2])}）`).join("、") : "去年の新作に縦売りはありませんでした。";
-  const ss = b.profiles["春夏"].p;
-  document.getElementById("multv").textContent = "×" + (+m).toFixed(1);
-  const aw = b.aw.mult, isAw = aw != null && Math.abs(m - aw) < 0.001, isLy = Math.abs(m - 1) < 0.001;
-  document.getElementById("multhint").textContent = `春夏の縦売り ${(ss["縦売り"]*m*100).toFixed(1)}%・中堅 ${(ss["中堅"]*m*100).toFixed(1)}%（去年は ${(ss["縦売り"]*100).toFixed(1)}%・${(ss["中堅"]*100).toFixed(1)}%）` + (isAw ? "　今年のAW並み" : isLy ? "　去年並み" : "");
-  const ab = document.getElementById("m-awbtn");
-  ab.textContent = aw != null ? `今年のAW並み（×${aw.toFixed(1)}）` : "今年のAW並み（比べられない）";
-  ab.disabled = aw == null; ab.title = aw != null ? "" : b.aw.note;
-  ab.setAttribute("aria-pressed", isAw); document.getElementById("m-ly").setAttribute("aria-pressed", isLy);
+function renderPerType(){
+  const bi = state.b, B = DATA.brands[bi], mu = B.poolMean * state.level[bi];
+  const vals = GROUPS.map(g => LAUNCH.map(lm => { const V = cellYen(bi, g, lm); return {fy: V.slice(0,FY_END+1).reduce((a,v)=>a+v,0) * mu, all: V.reduce((a,v)=>a+v,0) * mu}; }));
+  const mx = Math.max(1, ...vals.flat().map(v => v.all));
+  let h = `<thead><tr><th>アイテム</th>${LAUNCH.map(lm => `<th>${lm}月に出す</th>`).join("")}</tr></thead><tbody>`;
+  GROUPS.forEach((g, gi) => { h += `<tr><td>${g}<span class="tag">${SEASON[g]}</span></td>` + vals[gi].map(v => `<td class="num"><span class="cell" style="background:color-mix(in srgb, var(--s2) ${Math.round(v.all/mx*50)}%, transparent)">${(v.all/1e4).toFixed(1)}</span> <span style="color:var(--ink-3);font-size:11px">${(v.fy/1e4).toFixed(1)}</span></td>`).join("") + `</tr>`; });
+  document.getElementById("pertype").innerHTML = h + "</tbody>";
+  document.getElementById("pertypenote").textContent = `大きい数字が1〜7月、小さい灰色の数字がそのうち1〜4月です（${ALL() ? "全モール" : "ZOZO"}・強さ ×${state.level[bi].toFixed(2)}・平均）。同じアイテムでも、出す月で1〜4月と5〜7月の分け方が変わります。`;
+}
+function renderMake(c){
+  const B = DATA.brands[state.b], a = B.arr, cells = state.cells[state.b], N = v => Math.round(v).toLocaleString("ja-JP");
+  let h = `<thead><tr><th>投入月</th><th>型数</th><th>初回の枚数</th><th>追加の枚数</th><th>入荷 計</th><th>仕入れ（下代・万円）</th></tr></thead><tbody>`; let T = {n:0, i:0, d:0, c:0};
+  LAUNCH.forEach((lm, li) => { const n = GROUPS.reduce((x,g)=>x+(cells[g][lm]||0),0); const i = n * a.init, d = n * a.add, cost = (i + d) * a.cost;
+    T.n += n; T.i += i; T.d += d; T.c += cost;
+    h += `<tr><td><span class="sw" style="background:var(${SERIES[li]});margin-right:6px"></span>${lm}月に出す</td><td class="num">${n}</td><td class="num">${N(i)}</td><td class="num">${N(d)}</td><td class="num">${N(i+d)}</td><td class="num">${man(cost)}</td></tr>`; });
+  h += `</tbody><tfoot><tr><td>計</td><td class="num">${T.n}</td><td class="num">${N(T.i)}</td><td class="num">${N(T.d)}</td><td class="num">${N(T.i+T.d)}</td><td class="num">${man(T.c)}</td></tr></tfoot>`;
+  document.getElementById("maketable").innerHTML = h;
+  document.getElementById("makenote").textContent = `入荷は、去年の春夏の新作 ${a.n}型の1型あたりの平均（初回 ${N(a.init)}枚・追加 ${N(a.add)}枚、下代の平均 ¥${N(a.cost)}）です。1〜7月に売れる見込みは全チャネルで約 ${N(c.units)}枚（平均）。在庫で売上を止める計算はまだ入っていないので、目安として見てください。`;
+}
+function renderLevel(){
+  const B = DATA.brands[state.b], L = state.level[state.b], aw = B.aw.mult;
+  document.getElementById("levelv").textContent = "×" + L.toFixed(2);
+  document.querySelectorAll("[data-level]").forEach(x => { const k = x.dataset.level, v = k === "ly" ? 1 : k === "trend" ? 0.5 : aw;
+    if (k === "aw") { x.textContent = aw != null ? `今年のAW並み（×${aw.toFixed(2)}）` : "今年のAW並み（比べられない）"; x.disabled = aw == null; }
+    x.setAttribute("aria-pressed", v != null && Math.abs(L - v) < 0.001); });
+  document.getElementById("levelhint").textContent = `去年の春夏の新作 ${B.poolN}型の強さから抜き出し、この倍率を掛けます。前の年の強さで翌年を当てると、実際は0.3〜0.9倍（平均0.5倍）でした。` + (aw == null ? "このブランドは去年のAWの新作が少なく、今年のAWと比べられません。" : "");
 }
 function renderSave(){
   const b = DATA.brands[state.b], sv = state.saved[b.key], st = document.getElementById("savest"), lb = document.getElementById("loadbtn");
   if (!DB) { st.textContent = DB === null ? "この表示では保存できません（ログインした状態で開くと保存できます）。型数はこの端末に残ります。" : "保存の準備をしています…"; document.getElementById("savebtn").disabled = DB === null; lb.hidden = true; return; }
   document.getElementById("savebtn").disabled = false;
-  if (sv && sv.types) {
-    const d = sv.savedAt ? new Date(sv.savedAt) : null;
-    st.textContent = `決めた型数：${LAUNCH.map(lm => lm + "月" + (sv.types[lm]||0)).join("・")}（計${LAUNCH.reduce((a,lm)=>a+(sv.types[lm]||0),0)}型・当たり×${(+sv.mult||1).toFixed(1)}）` + (d ? `　${d.getMonth()+1}/${d.getDate()} ${String(d.getHours()).padStart(2,"0")}:${String(d.getMinutes()).padStart(2,"0")} 保存` : "");
+  if (sv && sv.cells) {
+    const d = sv.savedAt ? new Date(sv.savedAt) : null, t = sv.types || {};
+    st.textContent = `決めた型数：${LAUNCH.map(lm => lm + "月" + (t[lm]||0)).join("・")}（計${LAUNCH.reduce((a,lm)=>a+(t[lm]||0),0)}型・強さ×${(+sv.level||1).toFixed(2)}）` + (d ? `　${d.getMonth()+1}/${d.getDate()} ${String(d.getHours()).padStart(2,"0")}:${String(d.getMinutes()).padStart(2,"0")} 保存` : "");
     lb.hidden = false;
-  } else { st.textContent = "まだ決めた型数はありません。決めた型数は保存され、次の作業（カテゴリへの落とし込み）に使います。"; lb.hidden = true; }
+  } else { st.textContent = sv ? "前の形（投入月だけ）で保存された型数があります。アイテムごとの型数で決め直してください。" : "まだ決めた型数はありません。決めた型数は保存され、次の作業（カテゴリへの落とし込み）に使います。"; lb.hidden = true; }
 }
-function renderCalc(){ const c = compute(state.b); renderKpis(c); renderChart(c); renderTable(c); renderTiers(); renderMake();
-  document.getElementById("ntotal").textContent = LAUNCH.reduce((a,lm)=>a+(+state.n[state.b][lm]||0),0) + "型"; renderSave(); }
+function renderCalc(){
+  const c = simulate(state.b, state.cells[state.b], state.level[state.b], R);
+  renderTotals(); renderKpis(c); renderChart(c); renderTable(c); renderGroups(c); renderPerType(); renderMake(c); renderLevel(); renderSave();
+  return c;
+}
 function renderMethod(){
-  const b = DATA.brands[state.b], M = DATA.months.length;
+  const b = DATA.brands[state.b], M = NM;
   const ex = b.existingParts, K = ["継続（去年からの品番）", "継続（今年の春夏に出した品番）", "今季の投入済み新作"];
   document.getElementById("m-brand").textContent = b.name;
   const pctr = Math.round(b.ratio * 100);
   document.getElementById("m-eq").textContent = `${b.name} の1月 ＝ ${man(DATA.zozo[0])}万円 × ${pctr}% ＝ ${man(b.target[0])}万円`;
-  let h = `<thead><tr><th>月</th><th>ZOZO の予算</th><th>配分</th><th>目標</th><th>既存品：去年からの品番</th><th>今年の春夏の品番</th><th>今季の新作</th><th>既存品 計</th><th>新作で必要</th></tr></thead><tbody>`;
+  let h = `<thead><tr><th>月</th><th>ZOZO の予算</th><th>目標</th><th>既存品：去年からの品番</th><th>今年の春夏の品番</th><th>今季の新作</th><th>既存品 計</th><th>新作で必要</th></tr></thead><tbody>`;
   let tz = 0, tt = 0, te = [0,0,0], tx = 0, tg = 0;
-  DATA.months.forEach((m, i) => {
-    const e = K.map(k => ex[k][i] || 0), es = b.existing[i], g = Math.max(0, b.target[i] - es);
+  DATA.months.forEach((m, i) => { const e = K.map(k => ex[k][i] || 0), es = b.existing[i], g = Math.max(0, b.target[i] - es);
     tz += DATA.zozo[i]; tt += b.target[i]; e.forEach((v,j) => te[j] += v); tx += es; tg += g;
-    h += `<tr><td>${MONTH_LABEL(m)}</td><td class="num">${man(DATA.zozo[i])}</td><td class="num">${pctr}%</td><td class="num">${man(b.target[i])}</td>${e.map(v => `<td class="num">${man(v)}</td>`).join("")}<td class="num">${man(es)}</td><td class="num">${man(g)}</td></tr>`;
-  });
-  h += `</tbody><tfoot><tr><td>1〜7月</td><td class="num">${man(tz)}</td><td></td><td class="num">${man(tt)}</td>${te.map(v => `<td class="num">${man(v)}</td>`).join("")}<td class="num">${man(tx)}</td><td class="num">${man(tg)}</td></tr></tfoot>`;
+    h += `<tr><td>${MONTH_LABEL(m)}</td><td class="num">${man(DATA.zozo[i])}</td><td class="num">${man(b.target[i])}</td>${e.map(v => `<td class="num">${man(v)}</td>`).join("")}<td class="num">${man(es)}</td><td class="num">${man(g)}</td></tr>`; });
+  h += `</tbody><tfoot><tr><td>1〜7月</td><td class="num">${man(tz)}</td><td class="num">${man(tt)}</td>${te.map(v => `<td class="num">${man(v)}</td>`).join("")}<td class="num">${man(tx)}</td><td class="num">${man(tg)}</td></tr></tfoot>`;
   document.getElementById("m-target").innerHTML = h;
   document.getElementById("m-ss").textContent = `${b.name} は、去年の時点で発売3か月以内だった品番が ${b.fac.ssNew.toFixed(2)} 倍、それより前からの品番が ${b.fac.ssOld.toFixed(2)} 倍です。`;
   document.getElementById("m-coh").textContent = `${b.name} は 1月 ${b.fac.coh[0].toFixed(2)} 倍・4月 ${b.fac.coh[3].toFixed(2)} 倍・7月 ${b.fac.coh[M-1].toFixed(2)} 倍です（10月を1として）。`;
-  document.getElementById("m-stella").textContent = b.key === "stella" ? "STELLA FISH は去年の実績が少ないので、②の季節の伸びと残り方の比は、Futier Land と ABYS を合わせて測った値を使っています。" : "";
-  { const f1 = v => (v/1e4).toFixed(1);
-    let h = `<thead><tr><th>投入月</th>${DATA.months.map(m => `<th>${MONTH_LABEL(m)}</th>`).join("")}<th>1〜7月</th><th>混ぜたアイテム（多い順）</th></tr></thead><tbody>`;
-    LAUNCH.forEach(lm => { const pr = b.profiles[lm === "12" ? "秋冬" : "春夏"];
-      const E = DATA.months.map((_,m) => TIERS.reduce((a,t) => a + (pr.p[t] || 0) * (b.curves[lm][t][m] || 0), 0));
-      const mx = (b.season.mix[lm] || []).slice(0,3).map(z => `${z[0]} ${Math.round(z[1]*100)}%`).join("・");
-      h += `<tr><td><span class="sw" style="display:inline-block;background:var(${SERIES[LAUNCH.indexOf(lm)]});margin-right:6px;vertical-align:-1px"></span>${lm}月に出す</td>${E.map(v => `<td class="num">${v > 0 ? f1(v) : "–"}</td>`).join("")}<td class="num">${f1(E.reduce((a,v)=>a+v,0))}</td><td>${mx}</td></tr>`; });
-    document.getElementById("m-etable").innerHTML = h + "</tbody>";
-    const W = DATA.waveEx, ML = ["12月","1月","2月","3月","4月","5月","6月","7月"];
-    document.getElementById("m-wave").textContent = "例（12〜7月）：" + Object.entries(W).map(([k,v]) => `${k} ${v.map(x => x.toFixed(2)).join("・")}`).join("／") + "。";
-    const AA = DATA.seasonA, af = v => v.slice(0,7).map(x => x.toFixed(2)).join("・");
-    document.getElementById("m-age").textContent = `発売月・1か月目・…・6か月目の順に、12〜1月発売 ${af(AA["冬"])}／2〜3月発売 ${af(AA["早春"])}／4〜5月発売 ${af(AA["春夏"])}。`;
-    const bt = b.season.bt, fs = b.season.fs;
-    document.getElementById("m-bt").textContent = `${b.name} は、季節の波＝1・経過＝1 の月に 縦売り ${f1(bt["縦売り"])}万・中堅 ${f1(bt["中堅"])}万・その他 ${f1(bt["その他"])}万円です。夏物（7月の波が1.2より大きいアイテム）は ×${fs["夏物"].toFixed(2)}、それ以外は ×${fs["それ以外"].toFixed(2)} を掛けています（ZOZO 全体の夏の山ほど伸びるかどうかの違い。去年の新作の合計が合うように測った値${b.key === "stella" ? "。STELLA FISH は型が少ないので3ブランド合わせた値" : ""}）。`; }
-  const A = b.aw, P = v => v == null ? "–" : Math.round(v * 100) + "%", Y = v => v == null ? "–" : (v/1e4).toFixed(1) + "万";
-  document.getElementById("m-awrange").textContent = `去年・今年とも ${DATA.aw.range}`;
-  document.getElementById("m-awdays").textContent = DATA.aw.days;
-  document.getElementById("m-aw").innerHTML = `<thead><tr><th>${b.name}</th><th>型数</th><th>1型の平均</th><th>真ん中の型</th><th>30日で30万円以上</th><th>30日で10万円以上</th></tr></thead><tbody>` +
-    [["去年のAW", A["2025"]], ["今年のAW", A["2026"]]].map(([l, r]) => `<tr><td>${l}</td><td class="num">${r.n}</td><td class="num">${Y(r.avg)}</td><td class="num">${Y(r.med)}</td><td class="num">${P(r.hi)}</td><td class="num">${P(r.mid)}</td></tr>`).join("") + "</tbody>";
-  document.getElementById("m-awnote").textContent = A.mult != null ? `${b.name} の「今年のAW並み」は ×${A.mult.toFixed(1)} です（10万円以上の割合 ${P(A["2025"].mid)} → ${P(A["2026"].mid)}）。` : A.note + "このブランドの「今年のAW並み」のボタンは押せません。";
-  { const tz = b.target.reduce((a,v)=>a+v,0), tt = b.total.reduce((a,v)=>a+v,0);
-    document.getElementById("m-share").textContent = `${b.name} の1〜7月は 全モール ${yen(tt)}、うち ZOZO ${yen(tz)}（${Math.round(tz/tt*100)}%）。全モールの内訳：` + Object.entries(b.malls).sort((x,y)=>y[1]-x[1]).map(([k,v]) => `${k} ${yen(v)}`).join("・") + "。"; }
-  document.getElementById("m-asof").textContent = "使ったデータ：" + DATA.asof + "。新作の当たり方は2025年6月〜2026年7月に出た新作。";
+  document.getElementById("m-gamma").textContent = DATA.gamma;
+  const A = DATA.A, cls = ["冬物","春物","夏物","通年"], show = [0,1,2,3,4,5,6,7,8,9,10,11];
+  document.getElementById("m-age").innerHTML = `<thead><tr><th>季節の型</th>${show.map(k => `<th>${DATA.bins[k]}</th>`).join("")}</tr></thead><tbody>` +
+    cls.map(c => `<tr><td>${c}</td>${show.map(k => `<td class="num">${A[c][k].toFixed(2)}</td>`).join("")}</tr>`).join("") + "</tbody>";
+  document.getElementById("m-pool").textContent = `${b.name} は ${b.poolN}型（強さの平均 ${b.poolMean.toFixed(1)}）。強い型の例：` + b.hits.slice(0,3).map(x => `${x[1]}（${x[4]}・${x[3]}・${x[2]}）`).join("、") + "。";
+  document.getElementById("m-gf").textContent = "重さ：" + GROUPS.map(g => `${g} ${DATA.gf[g].toFixed(2)}`).join("・") + "。";
+  document.getElementById("m-ypu").textContent = `${b.name} は1枚あたり ¥${b.ypu["長袖シャツ・ブラウス"].toLocaleString("ja-JP")}（長袖シャツ・ブラウス）など。`;
+  document.getElementById("m-bt").innerHTML = `<thead><tr><th>当てたシーズン</th><th>ブランド</th><th>月の形のずれ（今のやり方）</th><th>月の形のずれ（前のやり方）</th><th>量：実際 ÷ 予測</th></tr></thead><tbody>
+    <tr><td>2026年 春夏</td><td>Futier Land</td><td class="num">4%</td><td class="num">6%</td><td class="num">0.68</td></tr>
+    <tr><td>2026年 春夏</td><td>ABYS</td><td class="num">27%</td><td class="num">27%</td><td class="num">0.39</td></tr>
+    <tr><td>2025年 春夏</td><td>Futier Land</td><td class="num">12%</td><td class="num">7%</td><td class="num">0.30</td></tr>
+    <tr><td>2025年 春夏</td><td>ABYS</td><td class="num">16%</td><td class="num">11%</td><td class="num">0.89</td></tr></tbody>`;
+  const aw = b.aw; document.getElementById("m-aw").textContent = aw.mult != null ? `${b.name} は 去年 ${aw.n25}型（平均 ${(+aw.mean25).toFixed(1)}）→ 今年 ${aw.n26}型（平均 ${(+aw.mean26).toFixed(1)}）で ×${aw.mult.toFixed(2)}。` : `${b.name} は去年のAWの新作が少ないので比べられません。`;
+  { const tz2 = b.target.reduce((a,v)=>a+v,0), tt2 = b.total.reduce((a,v)=>a+v,0);
+    document.getElementById("m-share").textContent = `${b.name} の1〜7月は 全モール ${yen(tt2)}、うち ZOZO ${yen(tz2)}（${Math.round(tz2/tt2*100)}%）。`; }
+  document.getElementById("m-asof").textContent = "使ったデータ：" + DATA.asof + "。";
 }
-function renderScope(){
-  const b = DATA.brands[state.b];
-  document.querySelectorAll("[data-scope]").forEach(x => x.setAttribute("aria-pressed", x.dataset.scope === state.scope));
-  const tz = b.target.reduce((a,v)=>a+v,0), tt = b.total.reduce((a,v)=>a+v,0);
-  document.getElementById("scopenote").textContent = ALL()
-    ? `全モールの予算で見ています（${b.name} の1〜7月 ${yen(tt)}、うち ZOZO ${yen(tz)}＝${Math.round(tz/tt*100)}%）。売上は ZOZO の見込みを ZOZO の割合で割って全体にしています。`
-    : `ZOZO の予算と ZOZO の売上（本店＋Yahoo 店）で見ています（${b.name} の1〜7月 ${yen(tz)}）。`;
-}
-function renderMake(){
-  const b = DATA.brands[state.b], n = state.n[state.b], mult = state.mult[state.b];
-  const rows = [], T = {cnt:0, init:0, add:0, cost:0, price:0, sold:0};
-  LAUNCH.forEach((lm, li) => {
-    const cnt = +n[lm] || 0, se = li === 0 ? "秋冬" : "春夏", A = b.arr[se], p = probs(b.profiles[se], mult);
-    const r = {lm, cnt, init:0, add:0, cost:0, price:0, sold:0};
-    TIERS.forEach(t => { const q = cnt * p[t], a = A[t], u = a.init + a.add;
-      r.init += q * a.init; r.add += q * a.add; r.cost += q * u * (a.cost || 0); r.price += q * u * (a.price || 0); r.sold += q * a.sold; });
-    rows.push(r); Object.keys(T).forEach(k => T[k] += k === "cnt" ? cnt : r[k]);
-  });
-  const N = v => Math.round(v).toLocaleString("ja-JP"), P = (s, u) => u > 0 ? Math.round(s / u * 100) + "%" : "–";
-  const tr = r => `<td class="num">${N(r.init)}</td><td class="num">${N(r.add)}</td><td class="num">${N(r.init + r.add)}</td><td class="num">${man(r.cost)}</td><td class="num">${man(r.price)}</td><td class="num">${N(r.sold)}</td><td class="num">${P(r.sold, r.init + r.add)}</td>`;
-  document.getElementById("maketable").innerHTML = `<thead><tr><th>投入月</th><th>型数</th><th>初回の枚数</th><th>追加の枚数</th><th>入荷 計（枚）</th><th>仕入れ金額（下代・万円）</th><th>上代の金額（万円）</th><th>9か月で売れる枚数</th><th>売れる割合</th></tr></thead><tbody>` +
-    rows.map(r => `<tr><td><span class="sw" style="display:inline-block;background:var(${SERIES[LAUNCH.indexOf(r.lm)]});margin-right:6px;vertical-align:-1px"></span>${r.lm}月に出す</td><td class="num">${r.cnt}</td>${tr(r)}</tr>`).join("") +
-    `</tbody><tfoot><tr><td>計</td><td class="num">${T.cnt}</td>${tr(T)}</tr></tfoot>`;
-  document.getElementById("makenote").textContent = T.cnt ? `この型数だと、まず初回で ${N(T.init)}枚（1型平均 ${N(T.init / T.cnt)}枚）を仕込み、当たった型の追加で ${N(T.add)}枚が加わる見込みです。仕入れ金額は計 ${yen(T.cost)}（うち初回 約${yen(rows.reduce((a,r)=>a + r.init / Math.max(1, r.init + r.add) * r.cost, 0))}）。` : "型数を入れると出ます。";
-  const sh = se => b.arr[se]._src === se ? se : `${se}（数が少ないので通年）`;
-  let h = `<thead><tr><th>季節・区分</th><th>去年の型数</th><th>初回（枚）</th><th>追加（枚）</th><th>下代</th><th>上代</th><th>9か月で売れた（枚）</th><th>売れた割合</th></tr></thead><tbody>`;
-  ["秋冬", "春夏"].forEach(se => TIERS.forEach(t => { const a = b.arr[se][t];
-    h += `<tr><td>${sh(se)} ${t}</td><td class="num">${a.n}</td><td class="num">${N(a.init)}</td><td class="num">${N(a.add)}</td><td class="num">¥${N(a.cost || 0)}</td><td class="num">¥${N(a.price || 0)}</td><td class="num">${N(a.sold)}</td><td class="num">${P(a.sold, a.init + a.add)}</td></tr>`; }));
-  document.getElementById("makebase").innerHTML = h + "</tbody>";
-}
-function renderAll(){ renderTabs(); renderScope(); renderRows(); renderItems(); renderCalc(); renderMethod(); }
+function renderAll(){ renderTabs(); renderScope(); renderInputs(); renderCalc(); renderMethod(); }
 
-document.querySelectorAll("[data-preset]").forEach(bt => bt.addEventListener("click", () => { const b = DATA.brands[state.b]; state.n[state.b] = bt.dataset.preset === "fill" ? fillFor(state.b) : {...b.presets[bt.dataset.preset]}; remember(); renderRows(); renderCalc(); }));
-// 「不足を型数で埋める」：「去年と同じ」の型数を同じ倍率で増やし、今のつまみの当たりで1〜7月の新作の売上が新作で必要な金額に届く、いちばん小さい倍率
-function fillFor(bi){ const base = DATA.brands[bi].presets.lastyear, keep = state.n[bi]; let lo = 0, hi = 80;
-  const mk = f => { const o = {}; LAUNCH.forEach(lm => o[lm] = Math.ceil((base[lm] || 0) * f)); return o; };
-  for (let i = 0; i < 40; i++) { const mid = (lo + hi) / 2; state.n[bi] = mk(mid); const c = compute(bi); if (c.newAll >= c.gapAll) hi = mid; else lo = mid; }
-  state.n[bi] = keep; return mk(hi); }
-document.getElementById("mult").addEventListener("input", e => { state.mult[state.b] = +e.target.value; remember(); renderCalc(); });
+// ひな形
+function scaled(base, f){ const o = blank(); GROUPS.forEach(g => LAUNCH.forEach(lm => o[g][lm] = Math.ceil((base[g][lm] || 0) * f))); return o; }
+function fillFor(bi, mode){
+  const base = DATA.brands[bi].presets.calendar, L = state.level[bi], b = VB(bi);
+  const ok = cells => { if (mode === "mean") { const nm = meanCalc(bi, cells, L); return nm.reduce((a,v)=>a+v,0) >= Math.max(0, b.target.reduce((a,v)=>a+v,0) - b.existing.reduce((a,v)=>a+v,0)); }
+    return simulate(bi, cells, L, 400).pAll >= 0.8; };
+  let lo = 0, hi = 1; while (!ok(scaled(base, hi)) && hi < 64) hi *= 2;
+  if (hi >= 64 && !ok(scaled(base, hi))) return null;
+  for (let i = 0; i < (mode === "mean" ? 30 : 16); i++) { const mid = (lo + hi) / 2; if (ok(scaled(base, mid))) hi = mid; else lo = mid; }
+  return scaled(base, hi);
+}
+document.querySelectorAll("[data-preset]").forEach(bt => bt.addEventListener("click", () => {
+  const bi = state.b, B = DATA.brands[bi], k = bt.dataset.preset, note = document.getElementById("presetnote");
+  let c = null;
+  if (k === "clear") c = blank();
+  else if (k === "fillmean" || k === "fill80") { note.textContent = "計算しています…"; c = fillFor(bi, k === "fillmean" ? "mean" : "p80");
+    note.textContent = c ? `「去年と同じ型数をカレンダーの月に」をすべてのマスで同じ倍率で増やし、${k === "fillmean" ? "1〜7月の平均で目標に届く" : "1〜7月の目標に8割の確率で届く"}いちばん少ない型数にしました（今の強さ ×${state.level[bi].toFixed(2)} で）。` : "64倍にしても届きませんでした。"; }
+  else { c = clone(B.presets[k]); note.textContent = k === "actual" ? "去年の春夏（2025年12月〜2026年5月）に実際に出した型数です（初めて売れた月で数えています）。" : k === "calendar" ? "時期別投入カレンダーのアイテムごとに、去年の春夏にそのアイテムで出した型数を、カレンダーの投入の月に置いたものです。" : "「去年と同じ型数をカレンダーの月に」の形のまま、12〜5月の合計を Futier Land 100型・ABYS 50型・STELLA FISH 50型にしたものです。"; }
+  if (!c) return; state.cells[bi] = c; remember(); renderInputs(); renderCalc();
+}));
+document.getElementById("level").addEventListener("input", e => { state.level[state.b] = +e.target.value; remember(); renderCalc(); });
+document.querySelectorAll("[data-level]").forEach(x => x.addEventListener("click", () => { const B = DATA.brands[state.b], k = x.dataset.level, v = k === "ly" ? 1 : k === "trend" ? 0.5 : B.aw.mult;
+  if (v == null) return; state.level[state.b] = v; document.getElementById("level").value = v; remember(); renderCalc(); }));
 document.querySelectorAll("[data-scope]").forEach(x => x.addEventListener("click", () => { state.scope = x.dataset.scope; remember(); renderAll(); }));
-const setMult = v => { state.mult[state.b] = v; document.getElementById("mult").value = v; remember(); renderCalc(); };
-document.getElementById("m-ly").addEventListener("click", () => setMult(1));
-document.getElementById("m-awbtn").addEventListener("click", () => { const a = DATA.brands[state.b].aw.mult; if (a != null) setMult(a); });
 
 let DB; // undefined=準備中, null=使えない
 document.getElementById("savebtn").addEventListener("click", async () => {
-  if (!DB) return; const b = DATA.brands[state.b], c = compute(state.b), st = document.getElementById("savest");
-  const body = {brand: b.name, types: {...state.n[state.b]}, mult: state.mult[state.b], savedAt: new Date().toISOString(),
-    newSales: Math.round(c.newAll), coverageFY: +c.fy.toFixed(3), coverageAll: +c.all.toFixed(3),
-    tate: +c.tierN["縦売り"].toFixed(1), chuken: +c.tierN["中堅"].toFixed(1)};
+  if (!DB) return; const bi = state.b, b = DATA.brands[bi], c = simulate(bi, state.cells[bi], state.level[bi], R), st = document.getElementById("savest");
+  const types = {}; LAUNCH.forEach(lm => types[lm] = GROUPS.reduce((a,g)=>a+(state.cells[bi][g][lm]||0),0));
+  const body = {brand: b.name, version: 2, cells: clone(state.cells[bi]), types, level: state.level[bi], savedAt: new Date().toISOString(),
+    newSales: Math.round(c.newAll), coverageFY: +c.fy.toFixed(3), coverageAll: +c.all.toFixed(3), pReachFY: +c.pFY.toFixed(3), pReachAll: +c.pAll.toFixed(3)};
   st.textContent = "保存しています…";
   try { await DB.doc("plans/" + b.key).set(body); }
   catch(e) { st.textContent = e && e.code === "invalid_argument" ? "保存する権限がありません（閲覧のみの共有）。" : "保存できませんでした。少し待ってからもう一度押してください。"; }
 });
-document.getElementById("loadbtn").addEventListener("click", () => { const b = DATA.brands[state.b], sv = state.saved[b.key]; if (!sv) return;
-  state.n[state.b] = {...state.n[state.b], ...sv.types}; state.mult[state.b] = +sv.mult || 1; remember(); renderRows(); renderCalc(); });
+document.getElementById("loadbtn").addEventListener("click", () => { const b = DATA.brands[state.b], sv = state.saved[b.key]; if (!sv || !sv.cells) return;
+  state.cells[state.b] = {...blank(), ...clone(sv.cells)}; state.level[state.b] = +sv.level || 1; remember(); renderInputs(); renderCalc(); });
 
 renderAll();
 (async () => {
   try { DB = window.claude && window.claude.use ? await window.claude.use("db") : null; } catch(e) { DB = null; }
   if (!DB) { renderSave(); return; }
-  DATA.brands.forEach(b => {
-    try { DB.doc("plans/" + b.key).onSnapshot(s => { state.saved[b.key] = s.exists ? s.data() : null; renderSave(); }, () => {}); } catch(e) {}
-  });
+  DATA.brands.forEach(b => { try { DB.doc("plans/" + b.key).onSnapshot(s => { state.saved[b.key] = s.exists ? s.data() : null; renderSave(); }, () => {}); } catch(e) {} });
   renderSave();
 })();
 </script>
